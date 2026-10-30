@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ shop.name }} · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ shop.name }}</h1>
+    <p class="muted">
+      <span class="badge {{ 'gold' if shop.currency.kind == 'gold' else 'token' }}">{{ shop.currency.name }}</span>
+      {% if shop.refresh_period %}<span class="sep">·</span>刷新：{{ shop.refresh_period }}{% endif %}
+      {% if shop.note %}<span class="sep">·</span>{{ shop.note }}{% endif %}
+    </p>
+  </div>
+  <div class="row-actions">
+    <a class="btn ghost" href="/shops">返回</a>
+    <a class="btn ghost" href="/shops/{{ shop.id }}/edit">编辑</a>
+    <form method="post" action="/shops/{{ shop.id }}/delete" onsubmit="return confirm('删除商店「{{ shop.name }}」及其全部商品？')">
+      <button class="btn danger" type="submit">删除商店</button>
+    </form>
+  </div>
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h2>商品</h2>
+    <span class="muted small">{{ shop.offers | length }} 项</span>
+  </div>
+  {% if shop.offers %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>资源</th><th>资源数量</th><th>原价</th><th>折扣</th><th>实付</th><th>单价 / 千</th><th>限购</th><th class="right">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for offer in shop.offers %}
+      <tr>
+        <td class="strong">{{ offer.resource.name }}</td>
+        <td>{{ offer.resource_qty | num }}</td>
+        <td>{{ offer.list_currency_qty | num }} {{ shop.currency.name }}</td>
+        <td>{% if offer.discount_pct is not none %}{{ offer.discount_pct | num }}%{% else %}-{% endif %}</td>
+        <td>{{ offer.effective_currency_qty | num }} {{ shop.currency.name }}</td>
+        <td class="strong">{{ offer.unit_price_per_1000 | num }} {{ shop.currency.name }}/千</td>
+        <td>{% if offer.limit_qty %}{{ offer.limit_qty }}{% else %}-{% endif %}</td>
+        <td class="right">
+          <div class="row-actions">
+            <a class="btn ghost small" href="/shops/{{ shop.id }}/offers/{{ offer.id }}/edit">编辑</a>
+            <form method="post" action="/shops/{{ shop.id }}/offers/{{ offer.id }}/delete" onsubmit="return confirm('删除商品「{{ offer.resource.name }}」？')">
+              <button class="btn danger small" type="submit">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">这个商店还没有商品，用下面的表单添加。</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>添加商品</h2></div>
+  <form method="post" action="/shops/{{ shop.id }}/offers" class="grid-form">
+    <label>资源
+      <select name="resource_id" required>
+        <option value="">请选择资源</option>
+        {% for resource in resources %}
+        <option value="{{ resource.id }}">{{ resource.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>资源数量
+      <input type="number" step="any" min="0" name="resource_qty" required placeholder="100000">
+    </label>
+    <label>货币数量（原价）
+      <input type="number" step="any" min="0" name="list_currency_qty" required placeholder="500">
+    </label>
+    <label>折扣 %
+      <input type="number" step="any" min="0" max="100" name="discount_pct" placeholder="可选，填 20 表示减 20%">
+    </label>
+    <label>限购
+      <input type="number" step="1" min="1" name="limit_qty" placeholder="可选">
+    </label>
+    <div class="form-actions">
+      <button class="btn primary" type="submit">添加商品</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

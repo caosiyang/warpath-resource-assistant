@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}新建箱子 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>新建箱子</h1>
+    <p class="muted">先填箱子信息和首批资源，保存后还能在详情页继续添加。</p>
+  </div>
+  <a class="btn ghost" href="/boxes">返回箱子列表</a>
+</div>
+
+<form method="post" action="/boxes" class="card" x-data='boxForm({{ initial_items | tojson }})'>
+  <div class="grid-2">
+    <label>箱子名称
+      <input name="name" required maxlength="64" placeholder="如：中级资源自选箱" value="{{ form.get('name', '') }}">
+    </label>
+    <label>大小
+      <input name="size" maxlength="32" placeholder="小 / 中 / 大 / 超大" value="{{ form.get('size', '') }}">
+    </label>
+    <label>类型
+      <select name="selection_type">
+        <option value="choose_one" {{ 'selected' if form.get('selection_type', 'choose_one') == 'choose_one' else '' }}>自选一个</option>
+        <option value="fixed" {{ 'selected' if form.get('selection_type') == 'fixed' else '' }}>固定内容</option>
+        <option value="random" {{ 'selected' if form.get('selection_type') == 'random' else '' }}>随机</option>
+      </select>
+    </label>
+    <label>获取途径
+      <input name="source" maxlength="64" placeholder="如：战役 / 活动 / 联盟" value="{{ form.get('source', '') }}">
+    </label>
+    <label class="span-2">备注
+      <input name="note" placeholder="可选" value="{{ form.get('note', '') }}">
+    </label>
+  </div>
+
+  <div class="section-head">
+    <h2>箱内资源</h2>
+    <p class="hint">随机箱才需要填概率（0–1）；自选箱和固定箱留空即可。没有想要的资源？先到 <a href="/resources">资源</a> 页新建。</p>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table rows-table">
+      <thead>
+        <tr>
+          <th style="min-width: 160px;">资源</th>
+          <th>数量</th>
+          <th>概率（0–1）</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(row, index) in rows" :key="index">
+          <tr>
+            <td>
+              <select name="resource_id" x-model="row.resource_id" required>
+                <option value="">请选择资源</option>
+                {% for resource in resources %}
+                <option value="{{ resource.id }}">{{ resource.name }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input type="number" step="any" min="0" name="qty" x-model="row.qty" placeholder="500000" required></td>
+            <td><input type="number" step="any" min="0" max="1" name="probability" x-model="row.probability" placeholder="可选"></td>
+            <td class="right">
+              <button type="button" class="btn danger small" @click="rows.splice(index, 1)" x-show="rows.length > 1">删除</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <button type="button" class="btn ghost" @click="addRow()">+ 添加资源</button>
+
+  <div class="actions">
+    <a class="btn ghost" href="/boxes">取消</a>
+    <button class="btn primary" type="submit">保存箱子</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}编辑商店类型 · {{ shop_type.name }}{% endblock %}
+{% block content %}
+{% set has_shop = shop_type.shop_id is not none %}
+<div class="page-head">
+  <div>
+    <h1>编辑商店类型</h1>
+    <p class="muted">{{ shop_type.name }}</p>
+  </div>
+  <a class="btn ghost" href="/shop-types">返回商店类型</a>
+</div>
+
+<form method="post" action="/shop-types/{{ shop_type.id }}/edit" class="card">
+  <div class="grid-2">
+    <label>商店名称
+      <input name="name" required maxlength="64" value="{{ form.get('name', shop_type.name) }}">
+    </label>
+    <label>货币
+      {% if has_shop %}
+      <input type="hidden" name="currency_id" value="{{ shop_type.currency_id }}">
+      {% endif %}
+      <select name="currency_id" required {{ 'disabled' if has_shop else '' }}>
+        <option value="">请选择货币</option>
+        {% for currency in currencies %}
+        {% set selected_currency = form.get('currency_id', shop_type.currency_id) | int %}
+        <option value="{{ currency.id }}" {{ 'selected' if currency.id == selected_currency else '' }}>
+          {{ currency.name }}{% if currency.kind == 'gold' %}（黄金）{% else %}（代币）{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>默认刷新周期
+      <input name="default_refresh_period" maxlength="32" placeholder="如：1周 / 3天 / 7天" value="{{ form.get('default_refresh_period', shop_type.default_refresh_period or '') }}">
+    </label>
+    <label>排序
+      <input type="number" step="1" name="sort_order" value="{{ form.get('sort_order', shop_type.sort_order) }}">
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="is_active" {{ 'checked' if form.get('is_active', shop_type.is_active) else '' }}>
+      启用
+    </label>
+    <label>备注
+      <input name="note" placeholder="可选" value="{{ form.get('note', shop_type.note or '') }}">
+    </label>
+  </div>
+  {% if has_shop %}
+  <p class="hint">该类型已创建商店，货币不可修改。如需换货币，请先删除对应商店。</p>
+  {% endif %}
+  <div class="actions">
+    <a class="btn ghost" href="/shop-types">取消</a>
+    <button class="btn primary" type="submit">保存修改</button>
+  </div>
+</form>
+{% endblock %}

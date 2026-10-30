@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}概览 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">WARPATH RESOURCE</p>
+    <h1>资源最大化，从一张准确的价格表开始</h1>
+    <p class="muted">先把 VIP18 的黄金兑换比例、商店商品和箱子内容录进来，后续 agent 才能算出真正的性价比。</p>
+  </div>
+  <div class="hero-actions">
+    <a class="btn primary" href="/shops/new">+ 新建商店</a>
+    <a class="btn ghost" href="/boxes/new">+ 新建箱子</a>
+  </div>
+</section>
+
+<section class="stat-grid">
+  <div class="stat"><span class="stat-value">{{ stats.resources }}</span><span class="stat-label">资源</span></div>
+  <div class="stat"><span class="stat-value">{{ stats.currencies }}</span><span class="stat-label">货币</span></div>
+  <div class="stat"><span class="stat-value">{{ stats.shop_types }}</span><span class="stat-label">商店类型</span></div>
+  <div class="stat"><span class="stat-value">{{ stats.shops }}</span><span class="stat-label">商店</span></div>
+  <div class="stat"><span class="stat-value">{{ stats.offers }}</span><span class="stat-label">商品</span></div>
+  <div class="stat"><span class="stat-value">{{ stats.boxes }}</span><span class="stat-label">箱子</span></div>
+  <div class="stat"><span class="stat-value">{{ stats.box_items }}</span><span class="stat-label">箱内资源</span></div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <div class="card-head">
+      <h2>最近商店</h2>
+      <a class="link" href="/shops">全部 →</a>
+    </div>
+    {% if recent_shops %}
+    <ul class="simple-list">
+      {% for shop in recent_shops %}
+      <li>
+        <a href="/shops/{{ shop.id }}">{{ shop.name }}</a>
+        <span class="badge {{ 'gold' if shop.currency.kind == 'gold' else 'token' }}">{{ shop.currency.name }}</span>
+        <span class="muted small">{{ shop.offers | length }} 个商品</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">还没有商店，先 <a href="/shops/new">新建一个</a>。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>最近箱子</h2>
+      <a class="link" href="/boxes">全部 →</a>
+    </div>
+    {% if recent_boxes %}
+    <ul class="simple-list">
+      {% for box in recent_boxes %}
+      <li>
+        <a href="/boxes/{{ box.id }}">{{ box.name }}</a>
+        {% if box.size %}<span class="badge">{{ box.size }}</span>{% endif %}
+        <span class="muted small">{{ box.items | length }} 种资源</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">还没有箱子，先 <a href="/boxes/new">新建一个</a>。</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card tips">
+  <h2>录入顺序建议</h2>
+  <ol>
+    <li>在 <a href="/resources">资源</a> 里确认资源名称和单位。</li>
+    <li>在 <a href="/currencies">货币</a> 里确认黄金和各代币。</li>
+    <li>在 <a href="/shop-types">商店类型</a> 里维护商店名称和对应货币。</li>
+    <li>新建商店，选择商店类型并录入商品数量、货币原价和折扣。</li>
+    <li>新建箱子，录入可选资源和数量。</li>
+  </ol>
+</section>
+{% endblock %}

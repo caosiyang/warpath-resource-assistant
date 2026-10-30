@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}编辑商店 · {{ shop.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>编辑商店</h1>
+    <p class="muted">
+      {{ shop.name }}
+      <span class="badge {{ 'gold' if shop.currency.kind == 'gold' else 'token' }}">{{ shop.currency.name }}</span>
+    </p>
+  </div>
+  <a class="btn ghost" href="/shops/{{ shop.id }}">返回商店</a>
+</div>
+
+<form method="post" action="/shops/{{ shop.id }}/edit" class="card">
+  <div class="grid-2">
+    <label>商店类型
+      <input value="{{ shop.name }}" disabled>
+    </label>
+    <label>货币
+      <input value="{{ shop.currency.name }}" disabled>
+    </label>
+    <label>刷新周期
+      <input name="refresh_period" maxlength="32" placeholder="留空表示不设置" value="{{ form.get('refresh_period', shop.refresh_period or '') }}">
+    </label>
+    <label>备注
+      <input name="note" placeholder="可选" value="{{ form.get('note', shop.note or '') }}">
+    </label>
+  </div>
+  <p class="hint">商店类型和货币由“商店类型”决定，不能在这里修改。</p>
+  <div class="actions">
+    <a class="btn ghost" href="/shops/{{ shop.id }}">取消</a>
+    <button class="btn primary" type="submit">保存修改</button>
+  </div>
+</form>
+{% endblock %}

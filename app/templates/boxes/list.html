@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}箱子 · 战火勋章资源助手{% endblock %}
+{% block content %}
+{% set type_labels = {'choose_one': '自选一个', 'fixed': '固定内容', 'random': '随机'} %}
+<div class="page-head">
+  <div>
+    <h1>箱子</h1>
+    <p class="muted">记录箱子类型、可选资源和数量，后续用黄金等价物计算该选哪种资源。</p>
+  </div>
+  <a class="btn primary" href="/boxes/new">+ 新建箱子</a>
+</div>
+
+<section class="card">
+  {% if items %}
+  <table class="table">
+    <thead>
+      <tr><th>箱子</th><th>大小</th><th>类型</th><th>获取途径</th><th>资源数</th><th class="right">操作</th></tr>
+    </thead>
+    <tbody>
+      {% for box in items %}
+      <tr>
+        <td class="strong"><a href="/boxes/{{ box.id }}">{{ box.name }}</a></td>
+        <td>{% if box.size %}<span class="badge">{{ box.size }}</span>{% else %}-{% endif %}</td>
+        <td>{{ type_labels.get(box.selection_type, box.selection_type) }}</td>
+        <td class="muted">{{ box.source or '-' }}</td>
+        <td>{{ box.items | length }}</td>
+        <td class="right">
+          <div class="row-actions">
+            <a class="btn ghost small" href="/boxes/{{ box.id }}">查看</a>
+            <form method="post" action="/boxes/{{ box.id }}/delete" onsubmit="return confirm('删除箱子「{{ box.name }}」及其全部资源？')">
+              <button class="btn danger small" type="submit">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">还没有箱子，先 <a href="/boxes/new">新建一个</a>。</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}货币 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>货币</h1>
+    <p class="muted">黄金是通用等价物，其他代币用于各自的商店。每个商店绑定一种货币。</p>
+  </div>
+</div>
+
+<section class="grid-main">
+  <div class="card">
+    <div class="card-head"><h2>货币列表</h2><span class="muted small">{{ items | length }} 项</span></div>
+    {% if items %}
+    <table class="table">
+      <thead>
+        <tr><th>名称</th><th>类型</th><th>备注</th><th class="right">操作</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="strong">{{ item.name }}</td>
+          <td>
+            {% if item.kind == 'gold' %}
+            <span class="badge gold">黄金</span>
+            {% else %}
+            <span class="badge token">代币</span>
+            {% endif %}
+          </td>
+          <td class="muted">{{ item.note or '-' }}</td>
+          <td class="right">
+            <form method="post" action="/currencies/{{ item.id }}/delete" onsubmit="return confirm('删除货币「{{ item.name }}」？被商店引用时将无法删除。')">
+              <button class="btn danger small" type="submit">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">还没有货币。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>新建货币</h2></div>
+    <form method="post" action="/currencies" class="stack">
+      <label>货币名称
+        <input name="name" required maxlength="64" placeholder="如：战役币" value="{{ form.name if form else '' }}">
+      </label>
+      <label>类型
+        <select name="kind">
+          <option value="token" {{ 'selected' if not form or form.kind == 'token' else '' }}>代币</option>
+          <option value="gold" {{ 'selected' if form and form.kind == 'gold' else '' }}>黄金</option>
+        </select>
+      </label>
+      <label>备注
+        <input name="note" placeholder="可选" value="{{ form.note if form else '' }}">
+      </label>
+      <button class="btn primary" type="submit">保存货币</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

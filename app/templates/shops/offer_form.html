@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}编辑商品 · {{ shop.name }}{% endblock %}
+{% block content %}
+{% set selected_resource = (form.get('resource_id') or offer.resource_id) | int %}
+<div class="page-head">
+  <div>
+    <h1>编辑商品</h1>
+    <p class="muted">{{ shop.name }} · <span class="badge {{ 'gold' if shop.currency.kind == 'gold' else 'token' }}">{{ shop.currency.name }}</span></p>
+  </div>
+  <a class="btn ghost" href="/shops/{{ shop.id }}">返回商店</a>
+</div>
+
+<form method="post" action="/shops/{{ shop.id }}/offers/{{ offer.id }}/edit" class="card">
+  <div class="grid-form">
+    <label>资源
+      <select name="resource_id" required>
+        <option value="">请选择资源</option>
+        {% for resource in resources %}
+        <option value="{{ resource.id }}" {{ 'selected' if resource.id == selected_resource else '' }}>{{ resource.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>资源数量
+      <input type="number" step="any" min="0" name="resource_qty" required value="{{ form.get('resource_qty', offer.resource_qty) }}">
+    </label>
+    <label>货币数量（原价）
+      <input type="number" step="any" min="0" name="list_currency_qty" required value="{{ form.get('list_currency_qty', offer.list_currency_qty) }}">
+    </label>
+    <label>折扣 %
+      <input type="number" step="any" min="0" max="100" name="discount_pct" value="{{ form.get('discount_pct', offer.discount_pct if offer.discount_pct is not none else '') }}" placeholder="填 20 表示减 20%">
+    </label>
+    <label>限购
+      <input type="number" step="1" min="1" name="limit_qty" value="{{ form.get('limit_qty', offer.limit_qty if offer.limit_qty is not none else '') }}" placeholder="可选">
+    </label>
+    <div class="form-actions">
+      <a class="btn ghost" href="/shops/{{ shop.id }}">取消</a>
+      <button class="btn primary" type="submit">保存修改</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

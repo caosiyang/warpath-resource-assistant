@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}新建商店 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>新建商店</h1>
+    <p class="muted">选择商店类型，货币会自动带出；再录入首批商品。</p>
+  </div>
+  <a class="btn ghost" href="/shops">返回商店列表</a>
+</div>
+
+<form method="post" action="/shops" class="card" x-data='offerForm({{ initial_offers | tojson }})'>
+  <div class="grid-2">
+    <label>商店类型
+      <select name="shop_type_id" required>
+        <option value="">请选择商店类型</option>
+        {% for type in shop_types %}
+        <option value="{{ type.id }}" {{ 'selected' if form.get('shop_type_id')|string == type.id|string else '' }}>
+          {{ type.name }}（{{ type.currency.name }}{% if type.default_refresh_period %} · {{ type.default_refresh_period }}{% endif %}）
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>刷新周期
+      <input name="refresh_period" maxlength="32" placeholder="留空则使用商店类型默认值" value="{{ form.get('refresh_period', '') }}">
+    </label>
+    <label class="span-2">备注
+      <input name="note" placeholder="可选" value="{{ form.get('note', '') }}">
+    </label>
+  </div>
+
+  {% if not shop_types %}
+  <p class="hint">没有可用的商店类型。先去 <a href="/shop-types">商店类型</a> 页新增或启用。</p>
+  {% else %}
+  <p class="hint">货币由商店类型决定。没有想要的类型？去 <a href="/shop-types">商店类型</a> 页新建。</p>
+  {% endif %}
+
+  <div class="section-head">
+    <h2>商品</h2>
+    <p class="hint">折扣填减免百分比：填 <code>20</code> 表示减 20%，实付 = 原价 × 0.8；留空表示无折扣。没有想要的资源？先到 <a href="/resources">资源</a> 页新建。</p>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table rows-table">
+      <thead>
+        <tr>
+          <th style="min-width: 140px;">资源</th>
+          <th>资源数量</th>
+          <th>货币数量（原价）</th>
+          <th>折扣 %</th>
+          <th>限购</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="(row, index) in rows" :key="index">
+          <tr>
+            <td>
+              <select name="resource_id" x-model="row.resource_id" required>
+                <option value="">请选择资源</option>
+                {% for resource in resources %}
+                <option value="{{ resource.id }}">{{ resource.name }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input type="number" step="any" min="0" name="resource_qty" x-model="row.resource_qty" placeholder="100000" required></td>
+            <td><input type="number" step="any" min="0" name="list_currency_qty" x-model="row.list_currency_qty" placeholder="500" required></td>
+            <td><input type="number" step="any" min="0" max="100" name="discount_pct" x-model="row.discount_pct" placeholder="可选"></td>
+            <td><input type="number" step="1" min="1" name="limit_qty" x-model="row.limit_qty" placeholder="可选"></td>
+            <td class="right">
+              <button type="button" class="btn danger small" @click="rows.splice(index, 1)" x-show="rows.length > 1">删除</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <button type="button" class="btn ghost" @click="addRow()">+ 添加商品</button>
+
+  <div class="actions">
+    <a class="btn ghost" href="/shops">取消</a>
+    <button class="btn primary" type="submit">保存商店</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}编辑资源 · {{ box.name }}{% endblock %}
+{% block content %}
+{% set selected_resource = (form.get('resource_id') or item.resource_id) | int %}
+<div class="page-head">
+  <div>
+    <h1>编辑箱内资源</h1>
+    <p class="muted">{{ box.name }}</p>
+  </div>
+  <a class="btn ghost" href="/boxes/{{ box.id }}">返回箱子</a>
+</div>
+
+<form method="post" action="/boxes/{{ box.id }}/items/{{ item.id }}/edit" class="card">
+  <div class="grid-form">
+    <label>资源
+      <select name="resource_id" required>
+        <option value="">请选择资源</option>
+        {% for resource in resources %}
+        <option value="{{ resource.id }}" {{ 'selected' if resource.id == selected_resource else '' }}>{{ resource.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>数量
+      <input type="number" step="any" min="0" name="qty" required value="{{ form.get('qty', item.qty) }}">
+    </label>
+    <label>概率（0–1）
+      <input type="number" step="any" min="0" max="1" name="probability" value="{{ form.get('probability', item.probability if item.probability is not none else '') }}" placeholder="随机箱才填">
+    </label>
+    <div class="form-actions">
+      <a class="btn ghost" href="/boxes/{{ box.id }}">取消</a>
+      <button class="btn primary" type="submit">保存修改</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

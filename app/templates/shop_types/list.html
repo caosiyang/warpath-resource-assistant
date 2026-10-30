@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}商店类型 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>商店类型</h1>
+    <p class="muted">维护游戏里的商店名称和对应货币。创建商店时从这里选择，货币会自动带出。</p>
+  </div>
+  <a class="btn ghost" href="/shops">去商店列表</a>
+</div>
+
+<section class="grid-main">
+  <div class="card">
+    <div class="card-head"><h2>类型列表</h2><span class="muted small">{{ items | length }} 项</span></div>
+    {% if items %}
+    <table class="table">
+      <thead>
+        <tr><th>名称</th><th>货币</th><th>默认刷新</th><th>排序</th><th>状态</th><th>商店</th><th class="right">操作</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="strong">{{ item.name }}</td>
+          <td><span class="badge {{ 'gold' if item.currency.kind == 'gold' else 'token' }}">{{ item.currency.name }}</span></td>
+          <td class="muted">{{ item.default_refresh_period or '-' }}</td>
+          <td class="muted">{{ item.sort_order }}</td>
+          <td>
+            {% if item.is_active %}
+            <span class="badge ok">启用</span>
+            {% else %}
+            <span class="badge">停用</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.shop_id %}
+            <a href="/shops/{{ item.shop_id }}">已创建</a>
+            {% else %}
+            <span class="muted">-</span>
+            {% endif %}
+          </td>
+          <td class="right">
+            <div class="row-actions">
+              <a class="btn ghost small" href="/shop-types/{{ item.id }}/edit">编辑</a>
+              {% if not item.shop_id %}
+              <form method="post" action="/shop-types/{{ item.id }}/delete" onsubmit="return confirm('删除商店类型「{{ item.name }}」？')">
+                <button class="btn danger small" type="submit">删除</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">还没有商店类型，用右侧表单新建。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>新建商店类型</h2></div>
+    <form method="post" action="/shop-types" class="stack">
+      <label>商店名称
+        <input name="name" required maxlength="64" placeholder="如：特权商店" value="{{ form.get('name', '') if form else '' }}">
+      </label>
+      <label>货币
+        <select name="currency_id" required>
+          <option value="">请选择货币</option>
+          {% for currency in currencies %}
+          <option value="{{ currency.id }}" {{ 'selected' if form and form.get('currency_id')|string == currency.id|string else '' }}>
+            {{ currency.name }}{% if currency.kind == 'gold' %}（黄金）{% else %}（代币）{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <p class="hint">没有想要的货币？去 <a href="/currencies">货币</a> 页新建，再回来刷新本页。</p>
+      <label>默认刷新周期
+        <input name="default_refresh_period" maxlength="32" placeholder="如：1周 / 3天 / 7天" value="{{ form.get('default_refresh_period', '') if form else '' }}">
+      </label>
+      <label>排序
+        <input type="number" step="1" name="sort_order" value="{{ form.get('sort_order', 0) if form else 0 }}">
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_active" {{ 'checked' if not form or form.get('is_active') else '' }}>
+        启用
+      </label>
+      <label>备注
+        <input name="note" placeholder="可选" value="{{ form.get('note', '') if form else '' }}">
+      </label>
+      <button class="btn primary" type="submit">保存商店类型</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

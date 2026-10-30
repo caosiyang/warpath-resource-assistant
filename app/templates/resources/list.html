@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}资源 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>资源</h1>
+    <p class="muted">游戏内的资源字典，商店和箱子都会引用这里的名称。</p>
+  </div>
+</div>
+
+<section class="grid-main">
+  <div class="card">
+    <div class="card-head"><h2>资源列表</h2><span class="muted small">{{ items | length }} 项</span></div>
+    {% if items %}
+    <table class="table">
+      <thead>
+        <tr><th>名称</th><th>单位</th><th>分类</th><th>备注</th><th class="right">操作</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="strong">{{ item.name }}</td>
+          <td>{{ item.unit }}</td>
+          <td>{% if item.category %}<span class="badge">{{ item.category }}</span>{% else %}-{% endif %}</td>
+          <td class="muted">{{ item.note or '-' }}</td>
+          <td class="right">
+            <form method="post" action="/resources/{{ item.id }}/delete" onsubmit="return confirm('删除资源「{{ item.name }}」？被引用时将无法删除。')">
+              <button class="btn danger small" type="submit">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">还没有资源。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>新建资源</h2></div>
+    <form method="post" action="/resources" class="stack">
+      <label>资源名称
+        <input name="name" required maxlength="64" placeholder="如：钢铁" value="{{ form.name if form else '' }}">
+      </label>
+      <label>单位
+        <input name="unit" maxlength="32" placeholder="1" value="{{ form.unit if form else '1' }}">
+      </label>
+      <label>分类
+        <input name="category" maxlength="32" placeholder="基础资源 / 稀有资源" value="{{ form.category if form else '' }}">
+      </label>
+      <label>备注
+        <input name="note" placeholder="可选" value="{{ form.note if form else '' }}">
+      </label>
+      <button class="btn primary" type="submit">保存资源</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}战火勋章资源助手{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">战火勋章 <span>资源助手</span></a>
+    <nav>
+      <a href="/resources" class="{{ 'active' if request.url.path.startswith('/resources') else '' }}">资源</a>
+      <a href="/currencies" class="{{ 'active' if request.url.path.startswith('/currencies') else '' }}">货币</a>
+      <a href="/shop-types" class="{{ 'active' if request.url.path.startswith('/shop-types') else '' }}">商店类型</a>
+      <a href="/shops" class="{{ 'active' if request.url.path.startswith('/shops') else '' }}">商店</a>
+      <a href="/boxes" class="{{ 'active' if request.url.path.startswith('/boxes') else '' }}">箱子</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+    {% if msg %}
+    <div class="alert {{ 'error' if msg_kind == 'error' else 'ok' }}">{{ msg }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    数据仅存本地 SQLite · <code>data/warpath.db</code>
+  </footer>
+</body>
+</html>
