@@ -29,6 +29,7 @@ def create_shop_type(
     currency_name="战役币",
     currency_kind="token",
     refresh_period="7天",
+    pricing_mode="standard",
     is_active=True,
     sort_order=1,
 ):
@@ -39,12 +40,30 @@ def create_shop_type(
             "name": name,
             "currency_id": currency["id"],
             "default_refresh_period": refresh_period,
+            "pricing_mode": pricing_mode,
             "sort_order": sort_order,
             "is_active": is_active,
         },
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def create_vip_shop_type(
+    client,
+    name="特权商店",
+    currency_name="黄金",
+    currency_kind="gold",
+    refresh_period="1周",
+):
+    return create_shop_type(
+        client,
+        name=name,
+        currency_name=currency_name,
+        currency_kind=currency_kind,
+        refresh_period=refresh_period,
+        pricing_mode="vip_tiered",
+    )
 
 
 def create_shop(client, shop_type, offers=None, refresh_period=None):
@@ -90,6 +109,7 @@ def test_create_shop_type_and_duplicate(client):
     assert shop_type["name"] == "战役商店"
     assert shop_type["currency"]["name"] == "战役币"
     assert shop_type["default_refresh_period"] == "7天"
+    assert shop_type["pricing_mode"] == "standard"
     assert shop_type["shop_id"] is None
 
     duplicate = client.post(
@@ -290,6 +310,215 @@ def test_negative_quantity_validation(client):
         },
     )
     assert response.status_code == 422
+
+
+def test_vip_tiered_offer_requires_level(client):
+    resource = create_resource(client)
+    shop_type = create_vip_shop_type(client)
+    shop = create_shop(client, shop_type)
+
+    response = client.post(
+        f"/api/shops/{shop['id']}/offers",
+        json={
+            "resource_id": resource["id"],
+            "resource_qty": 1000,
+            "list_currency_qty": 10,
+        },
+    )
+    assert response.status_code == 400
+    assert "必须填写解锁特权等级" in response.json()["detail"]
+
+
+def test_standard_shop_rejects_vip_level(client):
+    resource = create_resource(client)
+    shop_type = create_shop_type(client)
+    shop = create_shop(client, shop_type)
+
+    response = client.post(
+        f"/api/shops/{shop['id']}/offers",
+        json={
+            "resource_id": resource["id"],
+            "resource_qty": 1000,
+            "list_currency_qty": 10,
+            "min_vip_level": 10,
+        },
+    )
+    assert response.status_code == 400
+    assert "不需要解锁特权等级" in response.json()["detail"]
+
+
+def test_duplicate_vip_offer_rejected(client):
+    resource = create_resource(client)
+    shop_type = create_vip_shop_type(client)
+    shop = create_shop(
+        client,
+        shop_type,
+        offers=[
+            {
+                "resource_id": resource["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 10,
+                "min_vip_level": 10,
+            }
+        ],
+    )
+
+    duplicate = client.post(
+        f"/api/shops/{shop['id']}/offers",
+        json={
+            "resource_id": resource["id"],
+            "resource_qty": 2000,
+            "list_currency_qty": 20,
+            "min_vip_level": 10,
+        },
+    )
+    assert duplicate.status_code == 400
+    assert "已有商品" in duplicate.json()["detail"]
+
+    allowed = client.post(
+        f"/api/shops/{shop['id']}/offers",
+        json={
+            "resource_id": resource["id"],
+            "resource_qty": 2000,
+            "list_currency_qty": 20,
+            "min_vip_level": 15,
+        },
+    )
+    assert allowed.status_code == 201
+
+
+def test_effective_offers_by_vip(client):
+    steel = create_resource(client)
+    oil = create_resource(client, name="石油")
+    shop_type = create_vip_shop_type(client)
+    shop = create_shop(
+        client,
+        shop_type,
+        offers=[
+            {
+                "resource_id": steel["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 100,
+                "discount_pct": 20,
+                "min_vip_level": 10,
+            },
+            {
+                "resource_id": steel["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 100,
+                "discount_pct": 30,
+                "min_vip_level": 15,
+            },
+            {
+                "resource_id": oil["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 200,
+                "discount_pct": 25,
+                "min_vip_level": 20,
+            },
+        ],
+    )
+
+    # VIP12: 只有钢铁 20%
+    offers = client.get(f"/api/shops/{shop['id']}/effective?vip_level=12").json()
+    assert len(offers) == 1
+    assert offers[0]["resource"]["name"] == "钢铁"
+    assert offers[0]["discount_pct"] == 20
+
+    # VIP18: 钢铁取最高 30%，石油未解锁
+    offers = client.get(f"/api/shops/{shop['id']}/effective?vip_level=18").json()
+    assert len(offers) == 1
+    assert offers[0]["discount_pct"] == 30
+
+    # VIP20: 钢铁 30% + 石油 25%
+    offers = client.get(f"/api/shops/{shop['id']}/effective?vip_level=20").json()
+    by_name = {offer["resource"]["name"]: offer for offer in offers}
+    assert by_name["钢铁"]["discount_pct"] == 30
+    assert by_name["石油"]["discount_pct"] == 25
+
+    # 不传 vip_level 时使用设置里的默认值 18
+    offers = client.get(f"/api/shops/{shop['id']}/effective").json()
+    assert len(offers) == 1
+
+
+def test_settings_api(client):
+    settings = client.get("/api/settings")
+    assert settings.status_code == 200
+    assert settings.json() == {"current_vip_level": 18, "max_vip_level": 25}
+
+    updated = client.put("/api/settings", json={"current_vip_level": 20})
+    assert updated.status_code == 200
+    assert updated.json()["current_vip_level"] == 20
+    assert client.get("/api/settings").json()["current_vip_level"] == 20
+
+    invalid = client.put("/api/settings", json={"current_vip_level": 26})
+    assert invalid.status_code == 422
+
+
+def test_pricing_mode_locked_with_offers(client):
+    resource = create_resource(client)
+    shop_type = create_vip_shop_type(client)
+    create_shop(
+        client,
+        shop_type,
+        offers=[
+            {
+                "resource_id": resource["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 10,
+                "min_vip_level": 10,
+            }
+        ],
+    )
+
+    response = client.patch(
+        f"/api/shop-types/{shop_type['id']}", json={"pricing_mode": "standard"}
+    )
+    assert response.status_code == 400
+    assert "不能修改定价模式" in response.json()["detail"]
+
+
+def test_page_settings(client):
+    page = client.get("/settings")
+    assert page.status_code == 200
+    assert "VIP18" in page.text
+
+    response = client.post(
+        "/settings", data={"current_vip_level": "20"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert client.get("/api/settings").json()["current_vip_level"] == 20
+
+
+def test_shop_detail_vip_view(client):
+    steel = create_resource(client)
+    shop_type = create_vip_shop_type(client)
+    shop = create_shop(
+        client,
+        shop_type,
+        offers=[
+            {
+                "resource_id": steel["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 100,
+                "discount_pct": 20,
+                "min_vip_level": 10,
+            },
+            {
+                "resource_id": steel["id"],
+                "resource_qty": 1000,
+                "list_currency_qty": 100,
+                "discount_pct": 30,
+                "min_vip_level": 15,
+            },
+        ],
+    )
+
+    page = client.get(f"/shops/{shop['id']}?vip=12")
+    assert page.status_code == 200
+    assert "未解锁" in page.text
+    assert "当前最优" in page.text
+    assert "VIP15" in page.text
 
 
 def test_pages_render(client):

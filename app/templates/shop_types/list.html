@@ -15,13 +15,20 @@
     {% if items %}
     <table class="table">
       <thead>
-        <tr><th>名称</th><th>货币</th><th>默认刷新</th><th>排序</th><th>状态</th><th>商店</th><th class="right">操作</th></tr>
+        <tr><th>名称</th><th>货币</th><th>定价模式</th><th>默认刷新</th><th>排序</th><th>状态</th><th>商店</th><th class="right">操作</th></tr>
       </thead>
       <tbody>
         {% for item in items %}
         <tr>
           <td class="strong">{{ item.name }}</td>
           <td><span class="badge {{ 'gold' if item.currency.kind == 'gold' else 'token' }}">{{ item.currency.name }}</span></td>
+          <td>
+            {% if item.pricing_mode == 'vip_tiered' %}
+            <span class="badge gold">特权阶梯</span>
+            {% else %}
+            <span class="badge">普通</span>
+            {% endif %}
+          </td>
           <td class="muted">{{ item.default_refresh_period or '-' }}</td>
           <td class="muted">{{ item.sort_order }}</td>
           <td>
@@ -77,6 +84,13 @@
       <label>默认刷新周期
         <input name="default_refresh_period" maxlength="32" placeholder="如：1周 / 3天 / 7天" value="{{ form.get('default_refresh_period', '') if form else '' }}">
       </label>
+      <label>定价模式
+        <select name="pricing_mode">
+          <option value="standard" {{ 'selected' if not form or form.get('pricing_mode', 'standard') == 'standard' else '' }}>普通</option>
+          <option value="vip_tiered" {{ 'selected' if form and form.get('pricing_mode') == 'vip_tiered' else '' }}>特权阶梯</option>
+        </select>
+      </label>
+      <p class="hint">特权阶梯商店需要为每个商品填写解锁特权等级，并按当前 VIP 取最高折扣。</p>
       <label>排序
         <input type="number" step="1" name="sort_order" value="{{ form.get('sort_order', 0) if form else 0 }}">
       </label>

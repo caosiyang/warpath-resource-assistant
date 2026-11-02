@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 
+MAX_VIP_LEVEL = 25
+DEFAULT_VIP_LEVEL = 18
+CURRENT_VIP_KEY = "current_vip_level"
+
 
 def _commit(db: Session) -> None:
     try:
@@ -49,6 +53,66 @@ def _ensure_shop_type(db: Session, shop_type_id: int) -> models.ShopType:
     if shop_type is None:
         raise ValueError("商店类型不存在")
     return shop_type
+
+
+def _validate_offer_vip_level(pricing_mode: str, min_vip_level: int | None) -> None:
+    if pricing_mode == "vip_tiered":
+        if min_vip_level is None:
+            raise ValueError("特权商店的商品必须填写解锁特权等级")
+        if not 1 <= min_vip_level <= MAX_VIP_LEVEL:
+            raise ValueError(f"解锁特权等级必须在 1–{MAX_VIP_LEVEL} 之间")
+    elif min_vip_level is not None:
+        raise ValueError("普通商店的商品不需要解锁特权等级")
+
+
+def _check_duplicate_vip_offer(
+    offers: list[models.ShopOffer] | list[schemas.ShopOfferCreate],
+    resource_id: int,
+    min_vip_level: int | None,
+    exclude_id: int | None = None,
+) -> None:
+    for offer in offers:
+        if exclude_id is not None and offer.id == exclude_id:
+            continue
+        if offer.resource_id == resource_id and offer.min_vip_level == min_vip_level:
+            raise ValueError("该资源在该特权等级已有商品")
+
+
+# ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
+def get_setting(db: Session, key: str, default: str | None = None) -> str | None:
+    setting = db.get(models.AppSetting, key)
+    if setting is None:
+        return default
+    return setting.value
+
+
+def set_setting(db: Session, key: str, value: str) -> str:
+    setting = db.get(models.AppSetting, key)
+    if setting is None:
+        setting = models.AppSetting(key=key, value=value)
+        db.add(setting)
+    else:
+        setting.value = value
+    _commit(db)
+    return value
+
+
+def get_current_vip_level(db: Session) -> int:
+    raw = get_setting(db, CURRENT_VIP_KEY, str(DEFAULT_VIP_LEVEL))
+    try:
+        level = int(raw)
+    except (TypeError, ValueError):
+        level = DEFAULT_VIP_LEVEL
+    return min(max(level, 1), MAX_VIP_LEVEL)
+
+
+def set_current_vip_level(db: Session, level: int) -> int:
+    if not 1 <= level <= MAX_VIP_LEVEL:
+        raise ValueError(f"特权等级必须在 1–{MAX_VIP_LEVEL} 之间")
+    set_setting(db, CURRENT_VIP_KEY, str(level))
+    return level
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +217,10 @@ def update_shop_type(
             raise ValueError("该商店类型已创建商店，不能修改绑定货币")
         _ensure_currency(db, payload["currency_id"])
 
+    if "pricing_mode" in payload and payload["pricing_mode"] != obj.pricing_mode:
+        if obj.shop is not None and obj.shop.offers:
+            raise ValueError("该商店类型已有商品，不能修改定价模式")
+
     for key, value in payload.items():
         setattr(obj, key, value)
     _commit(db)
@@ -171,9 +239,18 @@ def delete_shop_type(db: Session, shop_type_id: int) -> None:
 # ---------------------------------------------------------------------------
 # Shops
 # ---------------------------------------------------------------------------
-def _validate_offer_resources(db: Session, offers: list[schemas.ShopOfferCreate]) -> None:
+def _validate_offer_resources(
+    db: Session, pricing_mode: str, offers: list[schemas.ShopOfferCreate]
+) -> None:
+    seen: set[tuple[int, int | None]] = set()
     for offer in offers:
         _ensure_resource(db, offer.resource_id)
+        _validate_offer_vip_level(pricing_mode, offer.min_vip_level)
+        if pricing_mode == "vip_tiered":
+            key = (offer.resource_id, offer.min_vip_level)
+            if key in seen:
+                raise ValueError("该资源在该特权等级已有商品")
+            seen.add(key)
 
 
 def create_shop(db: Session, data: schemas.ShopCreate) -> models.Shop:
@@ -182,7 +259,7 @@ def create_shop(db: Session, data: schemas.ShopCreate) -> models.Shop:
         raise ValueError("该商店类型已停用，无法创建商店")
     if shop_type.shop is not None:
         raise ValueError("该商店类型已创建商店")
-    _validate_offer_resources(db, data.offers)
+    _validate_offer_resources(db, shop_type.pricing_mode, data.offers)
 
     refresh_period = (
         data.refresh_period
@@ -221,6 +298,11 @@ def delete_shop(db: Session, shop_id: int) -> None:
 def add_offer(db: Session, shop_id: int, data: schemas.ShopOfferCreate) -> models.ShopOffer:
     shop = _get(db, models.Shop, shop_id)
     _ensure_resource(db, data.resource_id)
+    _validate_offer_vip_level(shop.shop_type.pricing_mode, data.min_vip_level)
+    if shop.shop_type.pricing_mode == "vip_tiered":
+        _check_duplicate_vip_offer(
+            shop.offers, data.resource_id, data.min_vip_level
+        )
     offer = models.ShopOffer(shop_id=shop.id, **data.model_dump())
     db.add(offer)
     _commit(db)
@@ -237,6 +319,18 @@ def update_offer(
     payload = data.model_dump(exclude_unset=True)
     if "resource_id" in payload:
         _ensure_resource(db, payload["resource_id"])
+
+    new_resource_id = payload.get("resource_id", offer.resource_id)
+    new_min_vip = payload.get("min_vip_level", offer.min_vip_level)
+    _validate_offer_vip_level(offer.shop.shop_type.pricing_mode, new_min_vip)
+    if offer.shop.shop_type.pricing_mode == "vip_tiered":
+        _check_duplicate_vip_offer(
+            offer.shop.offers,
+            new_resource_id,
+            new_min_vip,
+            exclude_id=offer.id,
+        )
+
     for key, value in payload.items():
         setattr(offer, key, value)
     _commit(db)
@@ -250,6 +344,26 @@ def delete_offer(db: Session, shop_id: int, offer_id: int) -> None:
         raise ValueError("商品不属于该商店")
     db.delete(offer)
     _commit(db)
+
+
+def effective_offers(shop: models.Shop, vip_level: int) -> list[models.ShopOffer]:
+    """返回当前特权等级下每个资源的最优商品。"""
+    if shop.shop_type.pricing_mode != "vip_tiered":
+        return sorted(shop.offers, key=lambda offer: (offer.resource.name, offer.id))
+
+    best: dict[int, tuple[tuple[float, float], models.ShopOffer]] = {}
+    for offer in shop.offers:
+        if offer.min_vip_level is not None and offer.min_vip_level > vip_level:
+            continue
+        key = (offer.discount_pct or 0.0, -offer.unit_price_per_1000)
+        current = best.get(offer.resource_id)
+        if current is None or key > current[0]:
+            best[offer.resource_id] = (key, offer)
+
+    return sorted(
+        (offer for _, offer in best.values()),
+        key=lambda offer: (offer.resource.name, offer.id),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -93,6 +93,7 @@ class ShopTypeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     currency_id: int
     default_refresh_period: str | None = Field(default=None, max_length=32)
+    pricing_mode: Literal["standard", "vip_tiered"] = "standard"
     sort_order: int = 0
     is_active: bool = True
     note: str | None = None
@@ -107,6 +108,7 @@ class ShopTypeUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
     currency_id: int | None = None
     default_refresh_period: str | None = Field(default=None, max_length=32)
+    pricing_mode: Literal["standard", "vip_tiered"] | None = None
     sort_order: int | None = None
     is_active: bool | None = None
     note: str | None = None
@@ -120,6 +122,7 @@ class ShopTypeUpdate(BaseModel):
 class ShopTypeBrief(ORMModel):
     id: int
     name: str
+    pricing_mode: str
 
 
 class ShopTypeOut(ORMModel):
@@ -127,6 +130,7 @@ class ShopTypeOut(ORMModel):
     name: str
     currency_id: int
     default_refresh_period: str | None
+    pricing_mode: str
     sort_order: int
     is_active: bool
     note: str | None
@@ -143,6 +147,7 @@ class ShopOfferCreate(BaseModel):
     resource_qty: float = Field(gt=0)
     list_currency_qty: float = Field(gt=0)
     discount_pct: float | None = Field(default=None, ge=0, le=100)
+    min_vip_level: int | None = Field(default=None, ge=1, le=25)
     limit_qty: int | None = Field(default=None, ge=1)
     note: str | None = None
 
@@ -152,6 +157,7 @@ class ShopOfferUpdate(BaseModel):
     resource_qty: float | None = Field(default=None, gt=0)
     list_currency_qty: float | None = Field(default=None, gt=0)
     discount_pct: float | None = Field(default=None, ge=0, le=100)
+    min_vip_level: int | None = Field(default=None, ge=1, le=25)
     limit_qty: int | None = Field(default=None, ge=1)
     note: str | None = None
 
@@ -163,6 +169,7 @@ class ShopOfferOut(ORMModel):
     resource_qty: float
     list_currency_qty: float
     discount_pct: float | None
+    min_vip_level: int | None
     limit_qty: int | None
     note: str | None
     created_at: datetime
@@ -268,3 +275,15 @@ class BoxOut(ORMModel):
     note: str | None
     created_at: datetime
     items: list[BoxItemOut]
+
+
+# ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
+class SettingsOut(BaseModel):
+    current_vip_level: int
+    max_vip_level: int
+
+
+class SettingsUpdate(BaseModel):
+    current_vip_level: int = Field(ge=1, le=25)

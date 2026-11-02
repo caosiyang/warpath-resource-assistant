@@ -25,9 +25,10 @@ uv run uvicorn app.main:app --reload --port 8765
 - 货币：黄金、战役币、联盟贡献币
 - 资源：食物、木材、钢铁、石油、合金
 - 商店类型：
-  - 特权商店 → 黄金，默认 1 周
+  - 特权商店 → 黄金，默认 1 周，**特权阶梯定价**
   - 联盟商店 → 联盟贡献币，默认 3 天
   - 战役商店 → 战役币，默认 7 天
+- 默认设置：当前特权等级 VIP18
 
 数据库文件在 `data/warpath.db`。
 
@@ -38,16 +39,17 @@ uv run uvicorn app.main:app --reload --port 8765
 | `/` | 概览与快捷入口 |
 | `/resources` | 资源字典 |
 | `/currencies` | 货币（黄金 / 代币） |
-| `/shop-types` | 商店类型（名称 + 绑定货币） |
+| `/shop-types` | 商店类型（名称 + 绑定货币 + 定价模式） |
 | `/shops` | 商店列表 |
 | `/shops/new` | 从商店类型创建商店（含首批商品） |
-| `/shops/{id}` | 商店详情，增删商品 |
+| `/shops/{id}` | 商店详情，增删商品；特权商店支持 VIP 切换 |
 | `/shops/{id}/edit` | 编辑商店的刷新周期和备注 |
 | `/shops/{id}/offers/{offer_id}/edit` | 编辑商品 |
 | `/boxes` | 箱子列表 |
 | `/boxes/new` | 新建箱子（含首批资源） |
 | `/boxes/{id}` | 箱子详情，增删资源 |
 | `/boxes/{id}/items/{item_id}/edit` | 编辑箱内资源 |
+| `/settings` | 当前特权等级（1–25） |
 
 ## 数据口径
 
@@ -66,6 +68,14 @@ uv run uvicorn app.main:app --reload --port 8765
 ```
 
 **商店类型绑定货币**：先在 `/shop-types` 维护“商店名称 → 货币”的对应关系，创建商店时选择类型，货币自动带出。一种类型只能创建一个商店；已创建商店后，类型绑定的货币不能修改。
+
+**特权阶梯定价**：
+
+- 商店类型的 `pricing_mode = vip_tiered` 时，每个商品必须有 `min_vip_level`（1–25）；
+- 商品在 VIP ≥ `min_vip_level` 时解锁；
+- 同一资源有多条可用记录时，取 `discount_pct` 最高的那条；折扣相同取单价最低；
+- 商店详情页可以用 `?vip=20` 临时切换查看，不修改全局设置；
+- 已创建商店后，商店类型的定价模式不能修改。
 
 **箱子类型**：
 
@@ -89,6 +99,7 @@ GET/PATCH/DELETE /api/shop-types/{id}
 
 GET/POST      /api/shops
 GET/PATCH/DELETE /api/shops/{id}
+GET           /api/shops/{id}/effective?vip_level=18
 POST          /api/shops/{id}/offers
 PATCH/DELETE  /api/shops/{id}/offers/{offer_id}
 
@@ -97,6 +108,7 @@ GET/PATCH/DELETE /api/boxes/{id}
 POST          /api/boxes/{id}/items
 PATCH/DELETE  /api/boxes/{id}/items/{item_id}
 
+GET/PUT       /api/settings
 GET           /api/health
 ```
 
@@ -117,10 +129,27 @@ curl -s http://127.0.0.1:8765/api/shops | python -m json.tool
       "resource_id": 1,
       "resource_qty": 100000,
       "list_currency_qty": 500,
-      "discount_pct": 20
+      "discount_pct": 20,
+      "min_vip_level": 10
     }
   ]
 }
+```
+
+特权商店必须填写 `min_vip_level`；普通商店不要传这个字段。
+
+临时查询某个 VIP 下的最优商品：
+
+```bash
+curl -s "http://127.0.0.1:8765/api/shops/1/effective?vip_level=18"
+```
+
+修改全局特权等级：
+
+```bash
+curl -X PUT http://127.0.0.1:8765/api/settings \
+  -H 'Content-Type: application/json' \
+  -d '{"current_vip_level": 20}'
 ```
 
 ## 测试

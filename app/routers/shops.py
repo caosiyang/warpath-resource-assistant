@@ -24,6 +24,21 @@ def create_shop(data: schemas.ShopCreate, db: Session = Depends(get_db)):
     return services.create_shop(db, data)
 
 
+@router.get("/{shop_id}/effective", response_model=list[schemas.ShopOfferOut])
+def effective_offers(
+    shop_id: int,
+    vip_level: int | None = None,
+    db: Session = Depends(get_db),
+):
+    shop = db.get(models.Shop, shop_id)
+    if shop is None:
+        raise HTTPException(status_code=404, detail="商店不存在")
+    level = vip_level if vip_level is not None else services.get_current_vip_level(db)
+    if not 1 <= level <= services.MAX_VIP_LEVEL:
+        raise ValueError(f"特权等级必须在 1–{services.MAX_VIP_LEVEL} 之间")
+    return services.effective_offers(shop, level)
+
+
 @router.get("/{shop_id}", response_model=schemas.ShopOut)
 def get_shop(shop_id: int, db: Session = Depends(get_db)):
     shop = db.get(models.Shop, shop_id)

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}设置 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>设置</h1>
+    <p class="muted">当前特权等级用于特权商店的最高折扣计算，也是后续 agent 的默认取值。</p>
+  </div>
+</div>
+
+<section class="card narrow">
+  <form method="post" action="/settings" class="stack">
+    <label>当前特权等级
+      <select name="current_vip_level">
+        {% for level in range(1, max_vip_level + 1) %}
+        <option value="{{ level }}" {{ 'selected' if level == current_vip_level else '' }}>VIP{{ level }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="hint">商店详情页可以用 <code>?vip=N</code> 临时切换查看，不会修改这里的全局值。</p>
+    <button class="btn primary" type="submit">保存设置</button>
+  </form>
+</section>
+{% endblock %}

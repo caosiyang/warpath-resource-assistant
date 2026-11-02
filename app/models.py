@@ -21,9 +21,15 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+
+
 class Resource(Base):
     __tablename__ = "resources"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     unit: Mapped[str] = mapped_column(String(32), default="1")
@@ -54,6 +60,12 @@ class ShopType(Base):
     """商店类型字典：商店名称 + 绑定货币。"""
 
     __tablename__ = "shop_types"
+    __table_args__ = (
+        CheckConstraint(
+            "pricing_mode IN ('standard', 'vip_tiered')",
+            name="ck_shop_type_pricing_mode",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
@@ -63,6 +75,7 @@ class ShopType(Base):
     default_refresh_period: Mapped[str | None] = mapped_column(
         String(32), default=None
     )
+    pricing_mode: Mapped[str] = mapped_column(String(16), default="standard")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     note: Mapped[str | None] = mapped_column(Text, default=None)
@@ -76,6 +89,10 @@ class ShopType(Base):
     @property
     def shop_id(self) -> int | None:
         return self.shop.id if self.shop is not None else None
+
+    @property
+    def is_vip_tiered(self) -> bool:
+        return self.pricing_mode == "vip_tiered"
 
 
 class Shop(Base):
@@ -108,11 +125,21 @@ class Shop(Base):
 class ShopOffer(Base):
     __tablename__ = "shop_offers"
     __table_args__ = (
+        UniqueConstraint(
+            "shop_id",
+            "resource_id",
+            "min_vip_level",
+            name="uq_shop_offer_resource_vip",
+        ),
         CheckConstraint("resource_qty > 0", name="ck_offer_resource_qty"),
         CheckConstraint("list_currency_qty > 0", name="ck_offer_currency_qty"),
         CheckConstraint(
             "discount_pct IS NULL OR (discount_pct >= 0 AND discount_pct <= 100)",
             name="ck_offer_discount",
+        ),
+        CheckConstraint(
+            "min_vip_level IS NULL OR (min_vip_level >= 1 AND min_vip_level <= 25)",
+            name="ck_offer_min_vip_level",
         ),
         CheckConstraint(
             "limit_qty IS NULL OR limit_qty >= 1", name="ck_offer_limit"
@@ -129,6 +156,9 @@ class ShopOffer(Base):
     resource_qty: Mapped[float] = mapped_column(Float)
     list_currency_qty: Mapped[float] = mapped_column(Float)
     discount_pct: Mapped[float | None] = mapped_column(Float, default=None)
+    min_vip_level: Mapped[int | None] = mapped_column(
+        Integer, default=None, index=True
+    )
     limit_qty: Mapped[int | None] = mapped_column(Integer, default=None)
     note: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)

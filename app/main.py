@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (register ORM models)
 from .db import Base, SessionLocal, engine
-from .routers import boxes, currencies, pages, resources, shop_types, shops
+from .routers import boxes, currencies, pages, resources, settings, shop_types, shops
 from .seed import seed
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,6 +32,7 @@ app.include_router(currencies.router)
 app.include_router(shop_types.router)
 app.include_router(shops.router)
 app.include_router(boxes.router)
+app.include_router(settings.router)
 
 
 @app.exception_handler(ValueError)

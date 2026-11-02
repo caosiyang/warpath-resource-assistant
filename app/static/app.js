@@ -4,6 +4,7 @@ function emptyOffer() {
     resource_qty: "",
     list_currency_qty: "",
     discount_pct: "",
+    min_vip_level: "",
     limit_qty: "",
   };
 }

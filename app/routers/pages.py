@@ -129,6 +129,45 @@ def index(request: Request, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
+@router.get("/settings")
+def settings_page(request: Request, db: Session = Depends(get_db)):
+    return _render(
+        request,
+        "settings.html",
+        current_vip_level=services.get_current_vip_level(db),
+        max_vip_level=services.MAX_VIP_LEVEL,
+    )
+
+
+@router.post("/settings")
+async def settings_submit(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    raw = (form.get("current_vip_level") or "").strip()
+    errors: list[str] = []
+    try:
+        level = int(raw)
+    except ValueError:
+        errors.append("特权等级必须是整数")
+        level = services.get_current_vip_level(db)
+    if not 1 <= level <= services.MAX_VIP_LEVEL:
+        errors.append(f"特权等级必须在 1–{services.MAX_VIP_LEVEL} 之间")
+
+    if errors:
+        return _render(
+            request,
+            "settings.html",
+            current_vip_level=services.get_current_vip_level(db),
+            max_vip_level=services.MAX_VIP_LEVEL,
+            error="；".join(errors),
+        )
+
+    services.set_current_vip_level(db, level)
+    return _redirect("/settings", "设置已保存")
+
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 @router.get("/resources")
@@ -218,6 +257,7 @@ def _shop_type_form_payload(form) -> dict:
         "currency_id": (form.get("currency_id") or "").strip(),
         "default_refresh_period": (form.get("default_refresh_period") or "").strip()
         or None,
+        "pricing_mode": (form.get("pricing_mode") or "standard").strip(),
         "sort_order": (form.get("sort_order") or "0").strip() or "0",
         "is_active": form.get("is_active") == "on",
         "note": (form.get("note") or "").strip() or None,
@@ -291,6 +331,7 @@ async def create_shop_type_page(request: Request, db: Session = Depends(get_db))
                 name=payload["name"],
                 currency_id=currency_id,
                 default_refresh_period=payload["default_refresh_period"],
+                pricing_mode=payload["pricing_mode"],
                 sort_order=sort_order,
                 is_active=payload["is_active"],
                 note=payload["note"],
@@ -365,6 +406,7 @@ async def shop_type_edit_submit(
                 name=payload["name"],
                 currency_id=currency_id,
                 default_refresh_period=payload["default_refresh_period"],
+                pricing_mode=payload["pricing_mode"],
                 sort_order=sort_order,
                 is_active=payload["is_active"],
                 note=payload["note"],
@@ -443,6 +485,7 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
     resource_qtys = form.getlist("resource_qty")
     list_costs = form.getlist("list_currency_qty")
     discounts = form.getlist("discount_pct")
+    min_vips = form.getlist("min_vip_level")
     limits = form.getlist("limit_qty")
 
     for index, resource_id in enumerate(resource_ids):
@@ -451,6 +494,7 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
             "resource_qty": _at(resource_qtys, index),
             "list_currency_qty": _at(list_costs, index),
             "discount_pct": _at(discounts, index),
+            "min_vip_level": _at(min_vips, index),
             "limit_qty": _at(limits, index),
         }
         if not any(value.strip() for value in row.values()):
@@ -466,6 +510,9 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
         discount = _parse_optional_float(
             row["discount_pct"], f"第 {index + 1} 行折扣", row_errors
         )
+        min_vip = _parse_optional_int(
+            row["min_vip_level"], f"第 {index + 1} 行解锁特权等级", row_errors
+        )
         limit = _parse_optional_int(row["limit_qty"], f"第 {index + 1} 行限购", row_errors)
         if row_errors:
             errors.extend(row_errors)
@@ -476,6 +523,7 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
                 resource_qty=resource_qty,
                 list_currency_qty=list_cost,
                 discount_pct=discount,
+                min_vip_level=min_vip,
                 limit_qty=limit,
             )
         )
@@ -528,7 +576,41 @@ def shop_detail_page(shop_id: int, request: Request, db: Session = Depends(get_d
     if shop is None:
         raise HTTPException(status_code=404, detail="商店不存在")
     resources = db.scalars(select(models.Resource).order_by(models.Resource.name)).all()
-    return _render(request, "shops/detail.html", shop=shop, resources=resources)
+
+    current_vip = services.get_current_vip_level(db)
+    view_vip: int | None = None
+    effective_ids: set[int] = set()
+    effective_count = 0
+    max_discount = 0.0
+
+    if shop.shop_type.pricing_mode == "vip_tiered":
+        view_vip = current_vip
+        raw_vip = request.query_params.get("vip")
+        if raw_vip:
+            try:
+                parsed_vip = int(raw_vip)
+            except ValueError:
+                parsed_vip = current_vip
+            if 1 <= parsed_vip <= services.MAX_VIP_LEVEL:
+                view_vip = parsed_vip
+        effective = services.effective_offers(shop, view_vip)
+        effective_ids = {offer.id for offer in effective}
+        effective_count = len(effective)
+        if effective:
+            max_discount = max((offer.discount_pct or 0) for offer in effective)
+
+    return _render(
+        request,
+        "shops/detail.html",
+        shop=shop,
+        resources=resources,
+        current_vip=current_vip,
+        view_vip=view_vip,
+        effective_ids=effective_ids,
+        effective_count=effective_count,
+        max_discount=max_discount,
+        max_vip_level=services.MAX_VIP_LEVEL,
+    )
 
 
 @router.get("/shops/{shop_id}/edit")
@@ -604,6 +686,9 @@ async def offer_edit_submit(
     resource_qty = _parse_float(form.get("resource_qty") or "", "资源数量", errors)
     list_cost = _parse_float(form.get("list_currency_qty") or "", "货币数量", errors)
     discount = _parse_optional_float(form.get("discount_pct") or "", "折扣", errors)
+    min_vip = _parse_optional_int(
+        form.get("min_vip_level") or "", "解锁特权等级", errors
+    )
     limit = _parse_optional_int(form.get("limit_qty") or "", "限购", errors)
 
     if errors:
@@ -618,6 +703,7 @@ async def offer_edit_submit(
                 "resource_qty": form.get("resource_qty") or "",
                 "list_currency_qty": form.get("list_currency_qty") or "",
                 "discount_pct": form.get("discount_pct") or "",
+                "min_vip_level": form.get("min_vip_level") or "",
                 "limit_qty": form.get("limit_qty") or "",
             },
             error="；".join(errors),
@@ -633,6 +719,7 @@ async def offer_edit_submit(
                 resource_qty=resource_qty,
                 list_currency_qty=list_cost,
                 discount_pct=discount,
+                min_vip_level=min_vip,
                 limit_qty=limit,
             ),
         )
@@ -648,6 +735,7 @@ async def offer_edit_submit(
                 "resource_qty": form.get("resource_qty") or "",
                 "list_currency_qty": form.get("list_currency_qty") or "",
                 "discount_pct": form.get("discount_pct") or "",
+                "min_vip_level": form.get("min_vip_level") or "",
                 "limit_qty": form.get("limit_qty") or "",
             },
             error=_error_text(exc),
@@ -665,6 +753,9 @@ async def add_offer_page(shop_id: int, request: Request, db: Session = Depends(g
     resource_qty = _parse_float(form.get("resource_qty") or "", "资源数量", errors)
     list_cost = _parse_float(form.get("list_currency_qty") or "", "货币数量", errors)
     discount = _parse_optional_float(form.get("discount_pct") or "", "折扣", errors)
+    min_vip = _parse_optional_int(
+        form.get("min_vip_level") or "", "解锁特权等级", errors
+    )
     limit = _parse_optional_int(form.get("limit_qty") or "", "限购", errors)
     if errors:
         return _redirect(f"/shops/{shop_id}", "；".join(errors), "error")
@@ -677,6 +768,7 @@ async def add_offer_page(shop_id: int, request: Request, db: Session = Depends(g
                 resource_qty=resource_qty,
                 list_currency_qty=list_cost,
                 discount_pct=discount,
+                min_vip_level=min_vip,
                 limit_qty=limit,
             ),
         )

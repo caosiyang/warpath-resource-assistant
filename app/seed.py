@@ -21,11 +21,11 @@ DEFAULT_RESOURCES = [
     ("合金", "1", "稀有资源"),
 ]
 
-# (商店名称, 货币名称, 默认刷新周期, 排序)
+# (商店名称, 货币名称, 默认刷新周期, 排序, 定价模式)
 DEFAULT_SHOP_TYPES = [
-    ("特权商店", "黄金", "1周", 1),
-    ("联盟商店", "联盟贡献币", "3天", 2),
-    ("战役商店", "战役币", "7天", 3),
+    ("特权商店", "黄金", "1周", 1, "vip_tiered"),
+    ("联盟商店", "联盟贡献币", "3天", 2, "standard"),
+    ("战役商店", "战役币", "7天", 3, "standard"),
 ]
 
 
@@ -47,7 +47,7 @@ def seed(db: Session) -> None:
             currency.name: currency
             for currency in db.scalars(select(models.Currency)).all()
         }
-        for name, currency_name, refresh_period, sort_order in DEFAULT_SHOP_TYPES:
+        for name, currency_name, refresh_period, sort_order, pricing_mode in DEFAULT_SHOP_TYPES:
             currency = currencies.get(currency_name)
             if currency is None:
                 continue
@@ -56,9 +56,13 @@ def seed(db: Session) -> None:
                     name=name,
                     currency_id=currency.id,
                     default_refresh_period=refresh_period,
+                    pricing_mode=pricing_mode,
                     sort_order=sort_order,
                     is_active=True,
                 )
             )
+
+    if db.get(models.AppSetting, "current_vip_level") is None:
+        db.add(models.AppSetting(key="current_vip_level", value="18"))
 
     db.commit()

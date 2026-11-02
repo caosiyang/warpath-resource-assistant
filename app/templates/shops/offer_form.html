@@ -29,6 +29,11 @@
     <label>折扣 %
       <input type="number" step="any" min="0" max="100" name="discount_pct" value="{{ form.get('discount_pct', offer.discount_pct if offer.discount_pct is not none else '') }}" placeholder="填 20 表示减 20%">
     </label>
+    {% if shop.shop_type.pricing_mode == 'vip_tiered' %}
+    <label>解锁特权等级
+      <input type="number" step="1" min="1" max="25" name="min_vip_level" required value="{{ form.get('min_vip_level', offer.min_vip_level if offer.min_vip_level is not none else '') }}" placeholder="1–25">
+    </label>
+    {% endif %}
     <label>限购
       <input type="number" step="1" min="1" name="limit_qty" value="{{ form.get('limit_qty', offer.limit_qty if offer.limit_qty is not none else '') }}" placeholder="可选">
     </label>

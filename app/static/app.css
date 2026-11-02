@@ -591,6 +591,61 @@ input[type="checkbox"] {
   text-align: center;
 }
 
+/* ---------------------------------------------------------------- vip tiers */
+.card.narrow {
+  max-width: 480px;
+}
+
+.vip-panel {
+  padding: 16px 20px;
+}
+
+.vip-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vip-switcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vip-switcher label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.vip-switcher select {
+  width: auto;
+  min-width: 100px;
+}
+
+.vip-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vip-summary strong {
+  color: var(--accent);
+}
+
+tr.locked td {
+  opacity: 0.45;
+}
+
+tr.locked:hover td {
+  background: transparent;
+}
+
 /* ---------------------------------------------------------------- responsive */
 @media (max-width: 900px) {
   .stat-grid {

@@ -2,6 +2,7 @@
 {% block title %}编辑商店类型 · {{ shop_type.name }}{% endblock %}
 {% block content %}
 {% set has_shop = shop_type.shop_id is not none %}
+{% set has_offers = has_shop and shop_type.shop.offers | length > 0 %}
 <div class="page-head">
   <div>
     <h1>编辑商店类型</h1>
@@ -32,6 +33,15 @@
     <label>默认刷新周期
       <input name="default_refresh_period" maxlength="32" placeholder="如：1周 / 3天 / 7天" value="{{ form.get('default_refresh_period', shop_type.default_refresh_period or '') }}">
     </label>
+    <label>定价模式
+      {% if has_offers %}
+      <input type="hidden" name="pricing_mode" value="{{ shop_type.pricing_mode }}">
+      {% endif %}
+      <select name="pricing_mode" {{ 'disabled' if has_offers else '' }}>
+        <option value="standard" {{ 'selected' if form.get('pricing_mode', shop_type.pricing_mode) == 'standard' else '' }}>普通</option>
+        <option value="vip_tiered" {{ 'selected' if form.get('pricing_mode', shop_type.pricing_mode) == 'vip_tiered' else '' }}>特权阶梯</option>
+      </select>
+    </label>
     <label>排序
       <input type="number" step="1" name="sort_order" value="{{ form.get('sort_order', shop_type.sort_order) }}">
     </label>
@@ -45,6 +55,9 @@
   </div>
   {% if has_shop %}
   <p class="hint">该类型已创建商店，货币不可修改。如需换货币，请先删除对应商店。</p>
+  {% endif %}
+  {% if has_offers %}
+  <p class="hint">该类型已有商品，定价模式不可修改。如需切换，请先删除商店内的商品。</p>
   {% endif %}
   <div class="actions">
     <a class="btn ghost" href="/shop-types">取消</a>

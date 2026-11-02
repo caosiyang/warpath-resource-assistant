@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{{ shop.name }} · 战火勋章资源助手{% endblock %}
 {% block content %}
+{% set vip_mode = shop.shop_type.pricing_mode == 'vip_tiered' %}
 <div class="page-head">
   <div>
     <h1>{{ shop.name }}</h1>
     <p class="muted">
       <span class="badge {{ 'gold' if shop.currency.kind == 'gold' else 'token' }}">{{ shop.currency.name }}</span>
+      {% if vip_mode %}<span class="badge gold">特权阶梯</span>{% endif %}
       {% if shop.refresh_period %}<span class="sep">·</span>刷新：{{ shop.refresh_period }}{% endif %}
       {% if shop.note %}<span class="sep">·</span>{{ shop.note }}{% endif %}
     </p>
@@ -19,6 +21,32 @@
   </div>
 </div>
 
+{% if vip_mode %}
+<section class="card vip-panel">
+  <div class="vip-panel-head">
+    <form method="get" action="/shops/{{ shop.id }}" class="vip-switcher">
+      <label>当前特权等级
+        <select name="vip" onchange="this.form.submit()">
+          {% for level in range(1, max_vip_level + 1) %}
+          <option value="{{ level }}" {{ 'selected' if level == view_vip else '' }}>VIP{{ level }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <noscript><button class="btn primary small" type="submit">应用</button></noscript>
+    </form>
+    <div class="vip-summary">
+      <span>可用资源 <strong>{{ effective_count }}</strong></span>
+      <span>最高折扣 <strong>{{ max_discount | num }}%</strong></span>
+      {% if view_vip != current_vip %}
+      <a class="link" href="/shops/{{ shop.id }}">恢复全局 VIP{{ current_vip }}</a>
+      {% else %}
+      <span class="muted small">全局设置 VIP{{ current_vip }}</span>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <section class="card">
   <div class="card-head">
     <h2>商品</h2>
@@ -28,18 +56,38 @@
   <table class="table">
     <thead>
       <tr>
-        <th>资源</th><th>资源数量</th><th>原价</th><th>折扣</th><th>实付</th><th>单价 / 千</th><th>限购</th><th class="right">操作</th>
+        <th>资源</th>
+        {% if vip_mode %}<th>解锁特权</th>{% endif %}
+        <th>资源数量</th><th>原价</th><th>折扣</th><th>实付</th><th>单价 / 千</th>
+        {% if vip_mode %}<th>状态</th>{% endif %}
+        <th>限购</th><th class="right">操作</th>
       </tr>
     </thead>
     <tbody>
       {% for offer in shop.offers %}
-      <tr>
+      {% set locked = vip_mode and offer.min_vip_level is not none and offer.min_vip_level > view_vip %}
+      {% set best = vip_mode and offer.id in effective_ids %}
+      <tr class="{{ 'locked' if locked else '' }}">
         <td class="strong">{{ offer.resource.name }}</td>
+        {% if vip_mode %}
+        <td>{% if offer.min_vip_level %}VIP{{ offer.min_vip_level }}{% else %}-{% endif %}</td>
+        {% endif %}
         <td>{{ offer.resource_qty | num }}</td>
         <td>{{ offer.list_currency_qty | num }} {{ shop.currency.name }}</td>
         <td>{% if offer.discount_pct is not none %}{{ offer.discount_pct | num }}%{% else %}-{% endif %}</td>
         <td>{{ offer.effective_currency_qty | num }} {{ shop.currency.name }}</td>
         <td class="strong">{{ offer.unit_price_per_1000 | num }} {{ shop.currency.name }}/千</td>
+        {% if vip_mode %}
+        <td>
+          {% if locked %}
+          <span class="badge">未解锁</span>
+          {% elif best %}
+          <span class="badge ok">当前最优</span>
+          {% else %}
+          <span class="badge">已解锁</span>
+          {% endif %}
+        </td>
+        {% endif %}
         <td>{% if offer.limit_qty %}{{ offer.limit_qty }}{% else %}-{% endif %}</td>
         <td class="right">
           <div class="row-actions">
@@ -78,6 +126,11 @@
     <label>折扣 %
       <input type="number" step="any" min="0" max="100" name="discount_pct" placeholder="可选，填 20 表示减 20%">
     </label>
+    {% if vip_mode %}
+    <label>解锁特权等级
+      <input type="number" step="1" min="1" max="{{ max_vip_level }}" name="min_vip_level" required placeholder="1–{{ max_vip_level }}">
+    </label>
+    {% endif %}
     <label>限购
       <input type="number" step="1" min="1" name="limit_qty" placeholder="可选">
     </label>
