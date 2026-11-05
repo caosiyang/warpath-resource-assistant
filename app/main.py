@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (register ORM models)
+from .data_io import maybe_import_on_startup
 from .db import Base, SessionLocal, engine
 from .migrations import run_migrations
 from .routers import (
@@ -31,7 +32,8 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_migrations(engine, SessionLocal)
     with SessionLocal() as db:
-        seed(db)
+        if not maybe_import_on_startup(db):
+            seed(db)
     yield
 
 

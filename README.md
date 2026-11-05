@@ -25,7 +25,7 @@ uv run uvicorn app.main:app --reload --port 8765
 
 `.env` 已被 gitignore，不会进仓库。不配置模型也能使用录入页面，只是 `/chat` 会提示模型未配置。
 
-首次启动会自动建表并写入种子数据：
+首次启动会自动建表：如果 `data/warpath-data.json` 存在，直接导入该快照；否则写入一组种子数据：
 
 - 货币：黄金、战役币、联盟贡献币
 - 资源类型：基础资源、稀有资源、兵卡资源
@@ -36,7 +36,23 @@ uv run uvicorn app.main:app --reload --port 8765
   - 战役商店 → 战役币，默认 7 天
 - 默认设置：当前特权等级 VIP18
 
-数据库文件在 `data/warpath.db`。
+数据库文件在 `data/warpath.db`，只在本机使用，不进仓库。仓库里提交的是业务数据快照 `data/warpath-data.json`：克隆后首次启动会自动导入，直接就能看到已有数据和设置。
+
+日常改完数据后，导出快照并提交：
+
+```bash
+uv run python scripts/export_data.py
+git add data/warpath-data.json
+```
+
+需要从快照重建本机数据库：
+
+```bash
+uv run python scripts/import_data.py            # 仅空库时导入
+uv run python scripts/import_data.py --replace  # 清空业务数据后导入
+```
+
+JSON 只包含资源、类型、货币、商店、商品、箱子和 VIP 设置，不含对话历史；外键用名称表示，没有时间戳和数字 ID，因此 diff 稳定、可合并。`data/*.db`、`-wal`、`-shm` 始终被 gitignore。
 
 ## 页面
 
@@ -254,10 +270,15 @@ app/
   llm.py           OpenAI 兼容流式客户端
   chat.py          工具定义、agent loop、SSE、会话持久化
   seed.py          种子数据
+  data_io.py       业务数据 JSON 导入/导出
   routers/         页面与 API 路由
   templates/       Jinja2 模板
   static/          CSS / Alpine.js
+scripts/
+  export_data.py   导出业务数据到 JSON
+  import_data.py   从 JSON 重建业务数据
 .env               本地模型配置（gitignore）
-data/warpath.db    本地数据库
+data/warpath-data.json  已提交的业务数据快照
+data/warpath.db    本地数据库（gitignore）
 tests/             pytest
 ```

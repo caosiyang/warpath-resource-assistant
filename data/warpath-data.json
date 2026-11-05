@@ -1,0 +1,227 @@
+{
+  "version": 1,
+  "settings": {
+    "current_vip_level": 18
+  },
+  "currencies": [
+    {
+      "name": "战役币",
+      "kind": "token",
+      "note": null
+    },
+    {
+      "name": "联盟贡献币",
+      "kind": "token",
+      "note": null
+    },
+    {
+      "name": "黄金",
+      "kind": "gold",
+      "note": null
+    }
+  ],
+  "resource_types": [
+    {
+      "name": "兵卡资源",
+      "sort_order": 0,
+      "note": null
+    },
+    {
+      "name": "其他",
+      "sort_order": 0,
+      "note": null
+    },
+    {
+      "name": "军官",
+      "sort_order": 0,
+      "note": null
+    },
+    {
+      "name": "军官装备",
+      "sort_order": 0,
+      "note": null
+    },
+    {
+      "name": "增益",
+      "sort_order": 0,
+      "note": null
+    },
+    {
+      "name": "资源",
+      "sort_order": 1,
+      "note": null
+    },
+    {
+      "name": "加速",
+      "sort_order": 2,
+      "note": null
+    }
+  ],
+  "resources": [
+    {
+      "name": "军用扳手",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "弹药",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "海军弹药",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "海军扳手",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "海军精密零件",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "海军零件",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "空军弹药",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "空军精密零件",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "空军零件",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "精密零件",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    },
+    {
+      "name": "零件",
+      "unit": "1",
+      "type": "兵卡资源",
+      "note": null
+    }
+  ],
+  "shop_types": [
+    {
+      "name": "特权商店",
+      "currency": "黄金",
+      "default_refresh_period": "1周",
+      "pricing_mode": "vip_tiered",
+      "sort_order": 1,
+      "is_active": true,
+      "note": null
+    },
+    {
+      "name": "联盟商店",
+      "currency": "联盟贡献币",
+      "default_refresh_period": "3天",
+      "pricing_mode": "standard",
+      "sort_order": 2,
+      "is_active": true,
+      "note": null
+    },
+    {
+      "name": "战役商店",
+      "currency": "战役币",
+      "default_refresh_period": "7天",
+      "pricing_mode": "standard",
+      "sort_order": 3,
+      "is_active": true,
+      "note": null
+    }
+  ],
+  "shops": [
+    {
+      "type": "特权商店",
+      "refresh_period": "1周",
+      "note": null,
+      "offers": [
+        {
+          "resource": "军用扳手",
+          "resource_qty": 1000,
+          "discounted_currency_qty": 1800,
+          "discount_pct": 70,
+          "min_vip_level": 12,
+          "limit_qty": 10,
+          "note": null
+        },
+        {
+          "resource": "军用扳手",
+          "resource_qty": 500,
+          "discounted_currency_qty": 1200,
+          "discount_pct": 60,
+          "min_vip_level": 15,
+          "limit_qty": 10,
+          "note": null
+        },
+        {
+          "resource": "弹药",
+          "resource_qty": 500,
+          "discounted_currency_qty": 1125,
+          "discount_pct": 75,
+          "min_vip_level": 15,
+          "limit_qty": 10,
+          "note": null
+        },
+        {
+          "resource": "弹药",
+          "resource_qty": 1000,
+          "discounted_currency_qty": 1800,
+          "discount_pct": 80,
+          "min_vip_level": 18,
+          "limit_qty": 10,
+          "note": null
+        },
+        {
+          "resource": "零件",
+          "resource_qty": 30,
+          "discounted_currency_qty": 135,
+          "discount_pct": 85,
+          "min_vip_level": 12,
+          "limit_qty": 20,
+          "note": null
+        }
+      ]
+    }
+  ],
+  "boxes": [
+    {
+      "name": "陆军资源自选箱",
+      "note": null,
+      "items": [
+        {
+          "resource": "弹药",
+          "qty": 100
+        },
+        {
+          "resource": "零件",
+          "qty": 30
+        }
+      ]
+    }
+  ]
+}
