@@ -14,6 +14,7 @@
 </section>
 
 <section class="stat-grid">
+  <div class="stat"><span class="stat-value">{{ stats.resource_types }}</span><span class="stat-label">资源类型</span></div>
   <div class="stat"><span class="stat-value">{{ stats.resources }}</span><span class="stat-label">资源</span></div>
   <div class="stat"><span class="stat-value">{{ stats.currencies }}</span><span class="stat-label">货币</span></div>
   <div class="stat"><span class="stat-value">{{ stats.shop_types }}</span><span class="stat-label">商店类型</span></div>
@@ -54,7 +55,6 @@
       {% for box in recent_boxes %}
       <li>
         <a href="/boxes/{{ box.id }}">{{ box.name }}</a>
-        {% if box.size %}<span class="badge">{{ box.size }}</span>{% endif %}
         <span class="muted small">{{ box.items | length }} 种资源</span>
       </li>
       {% endfor %}

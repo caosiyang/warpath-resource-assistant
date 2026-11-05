@@ -58,9 +58,9 @@
       <tr>
         <th>资源</th>
         {% if vip_mode %}<th>解锁特权</th>{% endif %}
-        <th>资源数量</th><th>原价</th><th>折扣</th><th>实付</th><th>单价 / 千</th>
+        <th>一组数量</th><th>折后价 / 组</th><th>折扣</th><th>原价 / 组</th><th>单价 / 个</th>
         {% if vip_mode %}<th>状态</th>{% endif %}
-        <th>限购</th><th class="right">操作</th>
+        <th>限购（组）</th><th class="right">操作</th>
       </tr>
     </thead>
     <tbody>
@@ -73,10 +73,10 @@
         <td>{% if offer.min_vip_level %}VIP{{ offer.min_vip_level }}{% else %}-{% endif %}</td>
         {% endif %}
         <td>{{ offer.resource_qty | num }}</td>
-        <td>{{ offer.list_currency_qty | num }} {{ shop.currency.name }}</td>
+        <td class="strong">{{ offer.discounted_currency_qty | num }} {{ shop.currency.name }}</td>
         <td>{% if offer.discount_pct is not none %}{{ offer.discount_pct | num }}%{% else %}-{% endif %}</td>
-        <td>{{ offer.effective_currency_qty | num }} {{ shop.currency.name }}</td>
-        <td class="strong">{{ offer.unit_price_per_1000 | num }} {{ shop.currency.name }}/千</td>
+        <td>{% if offer.original_currency_qty is not none %}{{ offer.original_currency_qty | num }} {{ shop.currency.name }}{% else %}-{% endif %}</td>
+        <td>{{ offer.unit_price | num }} {{ shop.currency.name }}/个</td>
         {% if vip_mode %}
         <td>
           {% if locked %}
@@ -88,7 +88,7 @@
           {% endif %}
         </td>
         {% endif %}
-        <td>{% if offer.limit_qty %}{{ offer.limit_qty }}{% else %}-{% endif %}</td>
+        <td>{% if offer.limit_qty %}{{ offer.limit_qty }} 组{% else %}-{% endif %}</td>
         <td class="right">
           <div class="row-actions">
             <a class="btn ghost small" href="/shops/{{ shop.id }}/offers/{{ offer.id }}/edit">编辑</a>
@@ -117,26 +117,27 @@
         {% endfor %}
       </select>
     </label>
-    <label>资源数量
-      <input type="number" step="any" min="0" name="resource_qty" required placeholder="100000">
+    <label>一组数量
+      <input type="number" step="any" min="0" name="resource_qty" required placeholder="30">
     </label>
-    <label>货币数量（原价）
-      <input type="number" step="any" min="0" name="list_currency_qty" required placeholder="500">
+    <label>折后价 / 组
+      <input type="number" step="any" min="0" name="discounted_currency_qty" required placeholder="135">
     </label>
-    <label>折扣 %
-      <input type="number" step="any" min="0" max="100" name="discount_pct" placeholder="可选，填 20 表示减 20%">
+    <label>折扣力度 %
+      <input type="number" step="any" min="0" max="100" name="discount_pct" placeholder="填 20 表示减 20%">
     </label>
     {% if vip_mode %}
     <label>解锁特权等级
       <input type="number" step="1" min="1" max="{{ max_vip_level }}" name="min_vip_level" required placeholder="1–{{ max_vip_level }}">
     </label>
     {% endif %}
-    <label>限购
-      <input type="number" step="1" min="1" name="limit_qty" placeholder="可选">
+    <label>限购（组）
+      <input type="number" step="1" min="1" name="limit_qty" placeholder="组">
     </label>
     <div class="form-actions">
       <button class="btn primary" type="submit">添加商品</button>
     </div>
   </form>
+  <p class="hint">原价由折后价和折扣反算：<code>原价 = 折后价 ÷ (1 - 折扣/100)</code>；单价按个计算。</p>
 </section>
 {% endblock %}

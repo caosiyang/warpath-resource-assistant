@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>资源</h1>
-    <p class="muted">游戏内的资源字典，商店和箱子都会引用这里的名称。</p>
+    <p class="muted">游戏内的资源字典，每个资源关联一个资源类型，商店和箱子都会引用这里的名称。</p>
   </div>
 </div>
 
@@ -14,19 +14,28 @@
     {% if items %}
     <table class="table">
       <thead>
-        <tr><th>名称</th><th>单位</th><th>分类</th><th>备注</th><th class="right">操作</th></tr>
+        <tr><th>名称</th><th>类型</th><th>单位</th><th>备注</th><th class="right">操作</th></tr>
       </thead>
       <tbody>
         {% for item in items %}
         <tr>
           <td class="strong">{{ item.name }}</td>
+          <td>
+            {% if item.resource_type %}
+            <span class="badge">{{ item.resource_type.name }}</span>
+            {% else %}
+            <span class="muted">未分类</span>
+            {% endif %}
+          </td>
           <td>{{ item.unit }}</td>
-          <td>{% if item.category %}<span class="badge">{{ item.category }}</span>{% else %}-{% endif %}</td>
           <td class="muted">{{ item.note or '-' }}</td>
           <td class="right">
-            <form method="post" action="/resources/{{ item.id }}/delete" onsubmit="return confirm('删除资源「{{ item.name }}」？被引用时将无法删除。')">
-              <button class="btn danger small" type="submit">删除</button>
-            </form>
+            <div class="row-actions">
+              <a class="btn ghost small" href="/resources/{{ item.id }}/edit">编辑</a>
+              <form method="post" action="/resources/{{ item.id }}/delete" onsubmit="return confirm('删除资源「{{ item.name }}」？被引用时将无法删除。')">
+                <button class="btn danger small" type="submit">删除</button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -43,11 +52,17 @@
       <label>资源名称
         <input name="name" required maxlength="64" placeholder="如：钢铁" value="{{ form.name if form else '' }}">
       </label>
+      <label>资源类型
+        <select name="type_id" required>
+          <option value="">请选择类型</option>
+          {% for type in resource_types %}
+          <option value="{{ type.id }}" {{ 'selected' if form and form.get('type_id')|string == type.id|string else '' }}>{{ type.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <p class="hint">没有想要的类型？去 <a href="/resource-types">资源类型</a> 页新建。</p>
       <label>单位
         <input name="unit" maxlength="32" placeholder="1" value="{{ form.unit if form else '1' }}">
-      </label>
-      <label>分类
-        <input name="category" maxlength="32" placeholder="基础资源 / 稀有资源" value="{{ form.category if form else '' }}">
       </label>
       <label>备注
         <input name="note" placeholder="可选" value="{{ form.note if form else '' }}">

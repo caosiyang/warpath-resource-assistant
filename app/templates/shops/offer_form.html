@@ -20,13 +20,13 @@
         {% endfor %}
       </select>
     </label>
-    <label>资源数量
+    <label>一组数量
       <input type="number" step="any" min="0" name="resource_qty" required value="{{ form.get('resource_qty', offer.resource_qty) }}">
     </label>
-    <label>货币数量（原价）
-      <input type="number" step="any" min="0" name="list_currency_qty" required value="{{ form.get('list_currency_qty', offer.list_currency_qty) }}">
+    <label>折后价 / 组
+      <input type="number" step="any" min="0" name="discounted_currency_qty" required value="{{ form.get('discounted_currency_qty', offer.discounted_currency_qty) }}">
     </label>
-    <label>折扣 %
+    <label>折扣力度 %
       <input type="number" step="any" min="0" max="100" name="discount_pct" value="{{ form.get('discount_pct', offer.discount_pct if offer.discount_pct is not none else '') }}" placeholder="填 20 表示减 20%">
     </label>
     {% if shop.shop_type.pricing_mode == 'vip_tiered' %}
@@ -34,13 +34,14 @@
       <input type="number" step="1" min="1" max="25" name="min_vip_level" required value="{{ form.get('min_vip_level', offer.min_vip_level if offer.min_vip_level is not none else '') }}" placeholder="1–25">
     </label>
     {% endif %}
-    <label>限购
-      <input type="number" step="1" min="1" name="limit_qty" value="{{ form.get('limit_qty', offer.limit_qty if offer.limit_qty is not none else '') }}" placeholder="可选">
+    <label>限购（组）
+      <input type="number" step="1" min="1" name="limit_qty" value="{{ form.get('limit_qty', offer.limit_qty if offer.limit_qty is not none else '') }}" placeholder="组">
     </label>
     <div class="form-actions">
       <a class="btn ghost" href="/shops/{{ shop.id }}">取消</a>
       <button class="btn primary" type="submit">保存修改</button>
     </div>
   </div>
+  <p class="hint">原价由折后价和折扣反算：<code>原价 = 折后价 ÷ (1 - 折扣/100)</code>；单价按个计算。</p>
 </form>
 {% endblock %}

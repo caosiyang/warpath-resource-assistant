@@ -37,7 +37,7 @@
 
   <div class="section-head">
     <h2>商品</h2>
-    <p class="hint">折扣填减免百分比：填 <code>20</code> 表示减 20%，实付 = 原价 × 0.8；留空表示无折扣。特权商店必须填写解锁特权等级（1–25），普通商店留空。没有想要的资源？先到 <a href="/resources">资源</a> 页新建。</p>
+    <p class="hint">填入“折后价/组”和折扣力度，原价会自动反算：<code>原价 = 折后价 ÷ (1 - 折扣/100)</code>。折扣填 <code>20</code> 表示减 20%；单价按个计算。特权商店必须填写解锁特权等级（1–25），普通商店留空。没有想要的资源？先到 <a href="/resources">资源</a> 页新建。</p>
   </div>
 
   <div class="table-wrap">
@@ -45,11 +45,11 @@
       <thead>
         <tr>
           <th style="min-width: 140px;">资源</th>
-          <th>资源数量</th>
-          <th>货币数量（原价）</th>
-          <th>折扣 %</th>
+          <th>一组数量</th>
+          <th>折后价 / 组</th>
+          <th>折扣力度 %</th>
           <th>解锁特权</th>
-          <th>限购</th>
+          <th>限购（组）</th>
           <th></th>
         </tr>
       </thead>
@@ -64,11 +64,11 @@
                 {% endfor %}
               </select>
             </td>
-            <td><input type="number" step="any" min="0" name="resource_qty" x-model="row.resource_qty" placeholder="100000" required></td>
-            <td><input type="number" step="any" min="0" name="list_currency_qty" x-model="row.list_currency_qty" placeholder="500" required></td>
+            <td><input type="number" step="any" min="0" name="resource_qty" x-model="row.resource_qty" placeholder="30" required></td>
+            <td><input type="number" step="any" min="0" name="discounted_currency_qty" x-model="row.discounted_currency_qty" placeholder="135" required></td>
             <td><input type="number" step="any" min="0" max="100" name="discount_pct" x-model="row.discount_pct" placeholder="可选"></td>
             <td><input type="number" step="1" min="1" max="25" name="min_vip_level" x-model="row.min_vip_level" placeholder="仅特权商店"></td>
-            <td><input type="number" step="1" min="1" name="limit_qty" x-model="row.limit_qty" placeholder="可选"></td>
+            <td><input type="number" step="1" min="1" name="limit_qty" x-model="row.limit_qty" placeholder="组"></td>
             <td class="right">
               <button type="button" class="btn danger small" @click="rows.splice(index, 1)" x-show="rows.length > 1">删除</button>
             </td>

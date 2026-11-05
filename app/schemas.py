@@ -18,12 +18,51 @@ def _clean_name(value: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Resource types
+# ---------------------------------------------------------------------------
+class ResourceTypeCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    sort_order: int = 0
+    note: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        return _clean_name(value)
+
+
+class ResourceTypeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    sort_order: int | None = None
+    note: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str | None) -> str | None:
+        return None if value is None else _clean_name(value)
+
+
+class ResourceTypeBrief(ORMModel):
+    id: int
+    name: str
+
+
+class ResourceTypeOut(ORMModel):
+    id: int
+    name: str
+    sort_order: int
+    note: str | None
+    created_at: datetime
+    resource_count: int
+
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 class ResourceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     unit: str = Field(default="1", max_length=32)
-    category: str | None = Field(default=None, max_length=32)
+    type_id: int
     note: str | None = None
 
     @field_validator("name")
@@ -35,7 +74,7 @@ class ResourceCreate(BaseModel):
 class ResourceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
     unit: str | None = Field(default=None, max_length=32)
-    category: str | None = Field(default=None, max_length=32)
+    type_id: int | None = None
     note: str | None = None
 
     @field_validator("name")
@@ -48,9 +87,10 @@ class ResourceOut(ORMModel):
     id: int
     name: str
     unit: str
-    category: str | None
+    type_id: int | None
     note: str | None
     created_at: datetime
+    resource_type: ResourceTypeBrief | None
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +185,7 @@ class ShopTypeOut(ORMModel):
 class ShopOfferCreate(BaseModel):
     resource_id: int
     resource_qty: float = Field(gt=0)
-    list_currency_qty: float = Field(gt=0)
+    discounted_currency_qty: float = Field(gt=0)
     discount_pct: float | None = Field(default=None, ge=0, le=100)
     min_vip_level: int | None = Field(default=None, ge=1, le=25)
     limit_qty: int | None = Field(default=None, ge=1)
@@ -155,7 +195,7 @@ class ShopOfferCreate(BaseModel):
 class ShopOfferUpdate(BaseModel):
     resource_id: int | None = None
     resource_qty: float | None = Field(default=None, gt=0)
-    list_currency_qty: float | None = Field(default=None, gt=0)
+    discounted_currency_qty: float | None = Field(default=None, gt=0)
     discount_pct: float | None = Field(default=None, ge=0, le=100)
     min_vip_level: int | None = Field(default=None, ge=1, le=25)
     limit_qty: int | None = Field(default=None, ge=1)
@@ -167,14 +207,14 @@ class ShopOfferOut(ORMModel):
     shop_id: int
     resource_id: int
     resource_qty: float
-    list_currency_qty: float
+    discounted_currency_qty: float
+    original_currency_qty: float | None
     discount_pct: float | None
     min_vip_level: int | None
     limit_qty: int | None
     note: str | None
     created_at: datetime
-    effective_currency_qty: float
-    unit_price_per_1000: float
+    unit_price: float
     resource: ResourceOut
 
 
@@ -211,14 +251,12 @@ class ShopOut(ORMModel):
 class BoxItemCreate(BaseModel):
     resource_id: int
     qty: float = Field(gt=0)
-    probability: float | None = Field(default=None, ge=0, le=1)
     note: str | None = None
 
 
 class BoxItemUpdate(BaseModel):
     resource_id: int | None = None
     qty: float | None = Field(default=None, gt=0)
-    probability: float | None = Field(default=None, ge=0, le=1)
     note: str | None = None
 
 
@@ -227,7 +265,6 @@ class BoxItemOut(ORMModel):
     box_id: int
     resource_id: int
     qty: float
-    probability: float | None
     note: str | None
     created_at: datetime
     resource: ResourceOut
@@ -236,14 +273,8 @@ class BoxItemOut(ORMModel):
 # ---------------------------------------------------------------------------
 # Boxes
 # ---------------------------------------------------------------------------
-SelectionType = Literal["choose_one", "fixed", "random"]
-
-
 class BoxCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
-    size: str | None = Field(default=None, max_length=32)
-    selection_type: SelectionType = "choose_one"
-    source: str | None = Field(default=None, max_length=64)
     note: str | None = None
     items: list[BoxItemCreate] = Field(default_factory=list)
 
@@ -255,9 +286,6 @@ class BoxCreate(BaseModel):
 
 class BoxUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
-    size: str | None = Field(default=None, max_length=32)
-    selection_type: SelectionType | None = None
-    source: str | None = Field(default=None, max_length=64)
     note: str | None = None
 
     @field_validator("name")
@@ -269,9 +297,6 @@ class BoxUpdate(BaseModel):
 class BoxOut(ORMModel):
     id: int
     name: str
-    size: str | None
-    selection_type: str
-    source: str | None
     note: str | None
     created_at: datetime
     items: list[BoxItemOut]

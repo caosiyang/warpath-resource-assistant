@@ -13,6 +13,12 @@ DEFAULT_CURRENCIES = [
     ("联盟贡献币", "token"),
 ]
 
+DEFAULT_RESOURCE_TYPES = [
+    ("基础资源", 1),
+    ("稀有资源", 2),
+    ("兵卡资源", 3),
+]
+
 DEFAULT_RESOURCES = [
     ("食物", "1", "基础资源"),
     ("木材", "1", "基础资源"),
@@ -38,9 +44,26 @@ def seed(db: Session) -> None:
             db.add(models.Currency(name=name, kind=kind))
         db.flush()
 
+    if db.scalar(select(models.ResourceType).limit(1)) is None:
+        for name, sort_order in DEFAULT_RESOURCE_TYPES:
+            db.add(models.ResourceType(name=name, sort_order=sort_order))
+        db.flush()
+
     if db.scalar(select(models.Resource).limit(1)) is None:
-        for name, unit, category in DEFAULT_RESOURCES:
-            db.add(models.Resource(name=name, unit=unit, category=category))
+        resource_types = {
+            resource_type.name: resource_type
+            for resource_type in db.scalars(select(models.ResourceType)).all()
+        }
+        for name, unit, type_name in DEFAULT_RESOURCES:
+            resource_type = resource_types.get(type_name)
+            if resource_type is None:
+                resource_type = models.ResourceType(name=type_name, sort_order=0)
+                db.add(resource_type)
+                db.flush()
+                resource_types[type_name] = resource_type
+            db.add(
+                models.Resource(name=name, unit=unit, type_id=resource_type.id)
+            )
 
     if db.scalar(select(models.ShopType).limit(1)) is None:
         currencies = {

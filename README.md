@@ -23,7 +23,8 @@ uv run uvicorn app.main:app --reload --port 8765
 首次启动会自动建表并写入种子数据：
 
 - 货币：黄金、战役币、联盟贡献币
-- 资源：食物、木材、钢铁、石油、合金
+- 资源类型：基础资源、稀有资源、兵卡资源
+- 资源：食物、木材、钢铁、石油、合金（关联到基础资源/稀有资源）
 - 商店类型：
   - 特权商店 → 黄金，默认 1 周，**特权阶梯定价**
   - 联盟商店 → 联盟贡献币，默认 3 天
@@ -37,7 +38,10 @@ uv run uvicorn app.main:app --reload --port 8765
 | 路径 | 功能 |
 | --- | --- |
 | `/` | 概览与快捷入口 |
-| `/resources` | 资源字典 |
+| `/resource-types` | 资源类型 |
+| `/resource-types/{id}/edit` | 编辑资源类型 |
+| `/resources` | 资源字典，创建时必须选择类型 |
+| `/resources/{id}/edit` | 编辑资源 |
 | `/currencies` | 货币（黄金 / 代币） |
 | `/shop-types` | 商店类型（名称 + 绑定货币 + 定价模式） |
 | `/shops` | 商店列表 |
@@ -53,19 +57,22 @@ uv run uvicorn app.main:app --reload --port 8765
 
 ## 数据口径
 
-**折扣**填减免百分比：
+**商品价格**录入的是“折后价/组”和折扣力度，原价自动反算：
 
 ```
-填 20  =>  实付 = 原价 × (1 - 20%) = 原价 × 0.8
-留空   =>  无折扣
+一组数量     = 30
+折后价/组    = 135
+折扣力度     = 85    # 表示减 85%
+原价/组      = 135 / (1 - 85%) = 900
+单价/个      = 135 / 30 = 4.5
 ```
 
-商品单价：
+- 折扣力度填减免百分比：填 `20` 表示减 20%；留空表示无折扣。
+- 原价只在页面和 API 中计算，不手工录入。
+- 限购单位是“组”，例如限购 20 组。
+- 单价按“个”计算，不再按千单位。
 
-```
-实付货币 = list_currency_qty × (1 - discount_pct / 100)
-单价     = 实付货币 / (resource_qty / 1000)
-```
+**资源类型**：先在 `/resource-types` 维护类型，创建/编辑资源时选择类型。类型下有资源时不能删除；类型改名后资源会自动跟随。
 
 **商店类型绑定货币**：先在 `/shop-types` 维护“商店名称 → 货币”的对应关系，创建商店时选择类型，货币自动带出。一种类型只能创建一个商店；已创建商店后，类型绑定的货币不能修改。
 
@@ -77,17 +84,16 @@ uv run uvicorn app.main:app --reload --port 8765
 - 商店详情页可以用 `?vip=20` 临时切换查看，不修改全局设置；
 - 已创建商店后，商店类型的定价模式不能修改。
 
-**箱子类型**：
-
-- `choose_one` 自选一个
-- `fixed` 固定内容
-- `random` 随机，需要填概率（0–1）
+**箱子**：所有箱子都是自选资源，只需要录入箱子名称、可选资源和每个资源的数量；不再区分大小、类型、获取途径，也不需要概率。
 
 ## API
 
 所有页面操作都有对应的 JSON 接口，后续 agent 直接调用。
 
 ```
+GET/POST      /api/resource-types
+GET/PATCH/DELETE /api/resource-types/{id}
+
 GET/POST      /api/resources
 GET/PATCH/DELETE /api/resources/{id}
 
@@ -118,6 +124,16 @@ GET           /api/health
 curl -s http://127.0.0.1:8765/api/shops | python -m json.tool
 ```
 
+创建资源的请求体（`type_id` 必填）：
+
+```json
+{
+  "name": "弹药",
+  "unit": "1",
+  "type_id": 1
+}
+```
+
 创建商店的请求体：
 
 ```json
@@ -127,14 +143,17 @@ curl -s http://127.0.0.1:8765/api/shops | python -m json.tool
   "offers": [
     {
       "resource_id": 1,
-      "resource_qty": 100000,
-      "list_currency_qty": 500,
-      "discount_pct": 20,
-      "min_vip_level": 10
+      "resource_qty": 30,
+      "discounted_currency_qty": 135,
+      "discount_pct": 85,
+      "min_vip_level": 18,
+      "limit_qty": 20
     }
   ]
 }
 ```
+
+这条商品表示：135 金币卖 30 个零件，限购 20 组；折扣 85% 时原价自动反算为 900，单价 4.5 金币/个。
 
 特权商店必须填写 `min_vip_level`；普通商店不要传这个字段。
 

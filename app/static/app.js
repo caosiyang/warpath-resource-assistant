@@ -2,7 +2,7 @@ function emptyOffer() {
   return {
     resource_id: "",
     resource_qty: "",
-    list_currency_qty: "",
+    discounted_currency_qty: "",
     discount_pct: "",
     min_vip_level: "",
     limit_qty: "",
@@ -22,7 +22,6 @@ function emptyBoxItem() {
   return {
     resource_id: "",
     qty: "",
-    probability: "",
   };
 }
 

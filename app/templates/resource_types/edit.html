@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}编辑资源类型 · {{ resource_type.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>编辑资源类型</h1>
+    <p class="muted">{{ resource_type.name }}</p>
+  </div>
+  <a class="btn ghost" href="/resource-types">返回资源类型</a>
+</div>
+
+<form method="post" action="/resource-types/{{ resource_type.id }}/edit" class="card narrow">
+  <div class="stack">
+    <label>类型名称
+      <input name="name" required maxlength="64" value="{{ form.get('name', resource_type.name) }}">
+    </label>
+    <label>排序
+      <input type="number" step="1" name="sort_order" value="{{ form.get('sort_order', resource_type.sort_order) }}">
+    </label>
+    <label>备注
+      <input name="note" placeholder="可选" value="{{ form.get('note', resource_type.note or '') }}">
+    </label>
+    <p class="hint">当前有 {{ resource_type.resource_count }} 个资源使用该类型。改名后资源会自动跟随新名称；使用中的类型不能删除。</p>
+    <div class="actions">
+      <a class="btn ghost" href="/resource-types">取消</a>
+      <button class="btn primary" type="submit">保存修改</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

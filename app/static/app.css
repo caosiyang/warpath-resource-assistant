@@ -669,7 +669,16 @@ tr.locked:hover td {
 
 @media (max-width: 620px) {
   .topbar {
-    padding: 0 16px;
+    height: auto;
+    min-height: 60px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 16px;
+  }
+
+  .topbar nav {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .container {

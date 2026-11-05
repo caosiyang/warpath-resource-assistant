@@ -55,6 +55,13 @@ def _ensure_shop_type(db: Session, shop_type_id: int) -> models.ShopType:
     return shop_type
 
 
+def _ensure_resource_type(db: Session, type_id: int) -> models.ResourceType:
+    resource_type = db.get(models.ResourceType, type_id)
+    if resource_type is None:
+        raise ValueError("资源类型不存在")
+    return resource_type
+
+
 def _validate_offer_vip_level(pricing_mode: str, min_vip_level: int | None) -> None:
     if pricing_mode == "vip_tiered":
         if min_vip_level is None:
@@ -116,10 +123,49 @@ def set_current_vip_level(db: Session, level: int) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Resource types
+# ---------------------------------------------------------------------------
+def create_resource_type(
+    db: Session, data: schemas.ResourceTypeCreate
+) -> models.ResourceType:
+    _ensure_unique_name(db, models.ResourceType, data.name)
+    obj = models.ResourceType(**data.model_dump())
+    db.add(obj)
+    _commit(db)
+    db.refresh(obj)
+    return obj
+
+
+def update_resource_type(
+    db: Session, type_id: int, data: schemas.ResourceTypeUpdate
+) -> models.ResourceType:
+    obj = _get(db, models.ResourceType, type_id)
+    payload = data.model_dump(exclude_unset=True)
+    if "name" in payload and payload["name"] != obj.name:
+        _ensure_unique_name(
+            db, models.ResourceType, payload["name"], exclude_id=obj.id
+        )
+    for key, value in payload.items():
+        setattr(obj, key, value)
+    _commit(db)
+    db.refresh(obj)
+    return obj
+
+
+def delete_resource_type(db: Session, type_id: int) -> None:
+    obj = _get(db, models.ResourceType, type_id)
+    if obj.resources:
+        raise ValueError("该类型下还有资源，无法删除")
+    db.delete(obj)
+    _commit(db)
+
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 def create_resource(db: Session, data: schemas.ResourceCreate) -> models.Resource:
     _ensure_unique_name(db, models.Resource, data.name)
+    _ensure_resource_type(db, data.type_id)
     obj = models.Resource(**data.model_dump())
     db.add(obj)
     _commit(db)
@@ -132,6 +178,8 @@ def update_resource(db: Session, resource_id: int, data: schemas.ResourceUpdate)
     payload = data.model_dump(exclude_unset=True)
     if "name" in payload and payload["name"] != obj.name:
         _ensure_unique_name(db, models.Resource, payload["name"], exclude_id=obj.id)
+    if payload.get("type_id") is not None:
+        _ensure_resource_type(db, payload["type_id"])
     for key, value in payload.items():
         setattr(obj, key, value)
     _commit(db)
@@ -355,7 +403,7 @@ def effective_offers(shop: models.Shop, vip_level: int) -> list[models.ShopOffer
     for offer in shop.offers:
         if offer.min_vip_level is not None and offer.min_vip_level > vip_level:
             continue
-        key = (offer.discount_pct or 0.0, -offer.unit_price_per_1000)
+        key = (offer.discount_pct or 0.0, -offer.unit_price)
         current = best.get(offer.resource_id)
         if current is None or key > current[0]:
             best[offer.resource_id] = (key, offer)
@@ -384,9 +432,6 @@ def create_box(db: Session, data: schemas.BoxCreate) -> models.Box:
 
     box = models.Box(
         name=data.name,
-        size=data.size,
-        selection_type=data.selection_type,
-        source=data.source,
         note=data.note,
     )
     for item in data.items:

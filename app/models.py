@@ -28,15 +28,36 @@ class AppSetting(Base):
     value: Mapped[str] = mapped_column(Text)
 
 
+class ResourceType(Base):
+    __tablename__ = "resource_types"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    resources: Mapped[list["Resource"]] = relationship(back_populates="resource_type")
+
+    @property
+    def resource_count(self) -> int:
+        return len(self.resources)
+
+
 class Resource(Base):
     __tablename__ = "resources"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     unit: Mapped[str] = mapped_column(String(32), default="1")
-    category: Mapped[str | None] = mapped_column(String(32), default=None)
+    type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("resource_types.id", ondelete="RESTRICT"), default=None, index=True
+    )
     note: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
+    resource_type: Mapped[ResourceType | None] = relationship(
+        back_populates="resources"
+    )
     offers: Mapped[list["ShopOffer"]] = relationship(back_populates="resource")
     box_items: Mapped[list["BoxItem"]] = relationship(back_populates="resource")
 
@@ -154,7 +175,10 @@ class ShopOffer(Base):
         ForeignKey("resources.id", ondelete="RESTRICT"), index=True
     )
     resource_qty: Mapped[float] = mapped_column(Float)
-    list_currency_qty: Mapped[float] = mapped_column(Float)
+    # 历史列名 list_currency_qty，实际存储“折后价/组”
+    discounted_currency_qty: Mapped[float] = mapped_column(
+        "list_currency_qty", Float
+    )
     discount_pct: Mapped[float | None] = mapped_column(Float, default=None)
     min_vip_level: Mapped[int | None] = mapped_column(
         Integer, default=None, index=True
@@ -167,15 +191,17 @@ class ShopOffer(Base):
     resource: Mapped[Resource] = relationship(back_populates="offers")
 
     @property
-    def effective_currency_qty(self) -> float:
+    def original_currency_qty(self) -> float | None:
         discount = self.discount_pct or 0.0
-        return self.list_currency_qty * (1 - discount / 100)
+        if discount >= 100:
+            return None
+        return round(self.discounted_currency_qty / (1 - discount / 100), 2)
 
     @property
-    def unit_price_per_1000(self) -> float:
+    def unit_price(self) -> float:
         if self.resource_qty <= 0:
             return 0.0
-        return self.effective_currency_qty / (self.resource_qty / 1000)
+        return round(self.discounted_currency_qty / self.resource_qty, 6)
 
 
 class Box(Base):
@@ -189,9 +215,8 @@ class Box(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    size: Mapped[str | None] = mapped_column(String(32), default=None)
+    # 历史列：所有箱子现在都按“自选资源”处理，不再对外暴露
     selection_type: Mapped[str] = mapped_column(String(16), default="choose_one")
-    source: Mapped[str | None] = mapped_column(String(64), default=None)
     note: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
@@ -207,10 +232,6 @@ class BoxItem(Base):
     __table_args__ = (
         UniqueConstraint("box_id", "resource_id", name="uq_box_item_resource"),
         CheckConstraint("qty > 0", name="ck_box_item_qty"),
-        CheckConstraint(
-            "probability IS NULL OR (probability >= 0 AND probability <= 1)",
-            name="ck_box_item_probability",
-        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -221,7 +242,6 @@ class BoxItem(Base):
         ForeignKey("resources.id", ondelete="RESTRICT"), index=True
     )
     qty: Mapped[float] = mapped_column(Float)
-    probability: Mapped[float | None] = mapped_column(Float, default=None)
     note: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 

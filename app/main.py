@@ -9,7 +9,17 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (register ORM models)
 from .db import Base, SessionLocal, engine
-from .routers import boxes, currencies, pages, resources, settings, shop_types, shops
+from .migrations import run_migrations
+from .routers import (
+    boxes,
+    currencies,
+    pages,
+    resource_types,
+    resources,
+    settings,
+    shop_types,
+    shops,
+)
 from .seed import seed
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -18,6 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine, SessionLocal)
     with SessionLocal() as db:
         seed(db)
     yield
@@ -27,6 +38,7 @@ app = FastAPI(title="战火勋章资源助手", version="0.1.0", lifespan=lifesp
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 app.include_router(pages.router)
+app.include_router(resource_types.router)
 app.include_router(resources.router)
 app.include_router(currencies.router)
 app.include_router(shop_types.router)

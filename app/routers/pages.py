@@ -105,6 +105,7 @@ def _parse_optional_int(value: str, label: str, errors: list[str]) -> int | None
 @router.get("/")
 def index(request: Request, db: Session = Depends(get_db)):
     stats = {
+        "resource_types": db.scalar(select(func.count()).select_from(models.ResourceType)),
         "resources": db.scalar(select(func.count()).select_from(models.Resource)),
         "currencies": db.scalar(select(func.count()).select_from(models.Currency)),
         "shop_types": db.scalar(select(func.count()).select_from(models.ShopType)),
@@ -168,35 +169,281 @@ async def settings_submit(request: Request, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
+# Resource types
+# ---------------------------------------------------------------------------
+def _resource_type_payload(form) -> dict:
+    return {
+        "name": (form.get("name") or "").strip(),
+        "sort_order": (form.get("sort_order") or "0").strip() or "0",
+        "note": (form.get("note") or "").strip() or None,
+    }
+
+
+def _resource_type_sort_order(payload: dict, errors: list[str]) -> int:
+    try:
+        return int(payload["sort_order"])
+    except ValueError:
+        errors.append("排序必须是整数")
+        return 0
+
+
+def _resource_type_list(db: Session):
+    return db.scalars(
+        select(models.ResourceType).order_by(
+            models.ResourceType.sort_order, models.ResourceType.name
+        )
+    ).all()
+
+
+@router.get("/resource-types")
+def resource_types_page(request: Request, db: Session = Depends(get_db)):
+    return _render(
+        request,
+        "resource_types/list.html",
+        items=_resource_type_list(db),
+        form={},
+    )
+
+
+@router.post("/resource-types")
+async def create_resource_type_page(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    payload = _resource_type_payload(form)
+    errors: list[str] = []
+    sort_order = _resource_type_sort_order(payload, errors)
+
+    if errors:
+        return _render(
+            request,
+            "resource_types/list.html",
+            items=_resource_type_list(db),
+            form=payload,
+            error="；".join(errors),
+        )
+
+    try:
+        services.create_resource_type(
+            db,
+            schemas.ResourceTypeCreate(
+                name=payload["name"],
+                sort_order=sort_order,
+                note=payload["note"],
+            ),
+        )
+    except (ValueError, ValidationError) as exc:
+        return _render(
+            request,
+            "resource_types/list.html",
+            items=_resource_type_list(db),
+            form=payload,
+            error=_error_text(exc),
+        )
+    return _redirect("/resource-types", "资源类型已创建")
+
+
+@router.get("/resource-types/{type_id}/edit")
+def resource_type_edit_page(
+    type_id: int, request: Request, db: Session = Depends(get_db)
+):
+    resource_type = db.get(models.ResourceType, type_id)
+    if resource_type is None:
+        raise HTTPException(status_code=404, detail="资源类型不存在")
+    return _render(
+        request,
+        "resource_types/edit.html",
+        resource_type=resource_type,
+        form={},
+    )
+
+
+@router.post("/resource-types/{type_id}/edit")
+async def resource_type_edit_submit(
+    type_id: int, request: Request, db: Session = Depends(get_db)
+):
+    form = await request.form()
+    resource_type = db.get(models.ResourceType, type_id)
+    if resource_type is None:
+        raise HTTPException(status_code=404, detail="资源类型不存在")
+
+    payload = _resource_type_payload(form)
+    errors: list[str] = []
+    sort_order = _resource_type_sort_order(payload, errors)
+
+    if errors:
+        return _render(
+            request,
+            "resource_types/edit.html",
+            resource_type=resource_type,
+            form=payload,
+            error="；".join(errors),
+        )
+
+    try:
+        services.update_resource_type(
+            db,
+            type_id,
+            schemas.ResourceTypeUpdate(
+                name=payload["name"],
+                sort_order=sort_order,
+                note=payload["note"],
+            ),
+        )
+    except (ValueError, ValidationError) as exc:
+        return _render(
+            request,
+            "resource_types/edit.html",
+            resource_type=resource_type,
+            form=payload,
+            error=_error_text(exc),
+        )
+    return _redirect("/resource-types", "资源类型已更新")
+
+
+@router.post("/resource-types/{type_id}/delete")
+def delete_resource_type_page(type_id: int, db: Session = Depends(get_db)):
+    try:
+        services.delete_resource_type(db, type_id)
+    except ValueError as exc:
+        return _redirect("/resource-types", _error_text(exc), "error")
+    return _redirect("/resource-types", "资源类型已删除")
+
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
+def _resource_payload(form) -> dict:
+    return {
+        "name": (form.get("name") or "").strip(),
+        "unit": (form.get("unit") or "1").strip() or "1",
+        "type_id": (form.get("type_id") or "").strip(),
+        "note": (form.get("note") or "").strip() or None,
+    }
+
+
+def _resource_type_id(payload: dict, errors: list[str]) -> int | None:
+    if not payload["type_id"]:
+        errors.append("请选择资源类型")
+        return None
+    try:
+        return int(payload["type_id"])
+    except ValueError:
+        errors.append("资源类型无效")
+        return None
+
+
+def _resource_list(db: Session):
+    return db.scalars(select(models.Resource).order_by(models.Resource.name)).all()
+
+
 @router.get("/resources")
 def resources_page(request: Request, db: Session = Depends(get_db)):
-    items = db.scalars(select(models.Resource).order_by(models.Resource.name)).all()
-    return _render(request, "resources/list.html", items=items)
+    return _render(
+        request,
+        "resources/list.html",
+        items=_resource_list(db),
+        resource_types=_resource_type_list(db),
+    )
 
 
 @router.post("/resources")
 async def create_resource_page(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
-    payload = {
-        "name": (form.get("name") or "").strip(),
-        "unit": (form.get("unit") or "1").strip() or "1",
-        "category": (form.get("category") or "").strip() or None,
-        "note": (form.get("note") or "").strip() or None,
-    }
-    try:
-        services.create_resource(db, schemas.ResourceCreate(**payload))
-    except (ValueError, ValidationError) as exc:
-        items = db.scalars(select(models.Resource).order_by(models.Resource.name)).all()
+    payload = _resource_payload(form)
+    errors: list[str] = []
+    type_id = _resource_type_id(payload, errors)
+
+    if errors:
         return _render(
             request,
             "resources/list.html",
-            items=items,
+            items=_resource_list(db),
+            resource_types=_resource_type_list(db),
+            form=payload,
+            error="；".join(errors),
+        )
+
+    try:
+        services.create_resource(
+            db,
+            schemas.ResourceCreate(
+                name=payload["name"],
+                unit=payload["unit"],
+                type_id=type_id,
+                note=payload["note"],
+            ),
+        )
+    except (ValueError, ValidationError) as exc:
+        return _render(
+            request,
+            "resources/list.html",
+            items=_resource_list(db),
+            resource_types=_resource_type_list(db),
             form=payload,
             error=_error_text(exc),
         )
     return _redirect("/resources", "资源已创建")
+
+
+@router.get("/resources/{resource_id}/edit")
+def resource_edit_page(
+    resource_id: int, request: Request, db: Session = Depends(get_db)
+):
+    resource = db.get(models.Resource, resource_id)
+    if resource is None:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    return _render(
+        request,
+        "resources/edit.html",
+        resource=resource,
+        resource_types=_resource_type_list(db),
+        form={},
+    )
+
+
+@router.post("/resources/{resource_id}/edit")
+async def resource_edit_submit(
+    resource_id: int, request: Request, db: Session = Depends(get_db)
+):
+    form = await request.form()
+    resource = db.get(models.Resource, resource_id)
+    if resource is None:
+        raise HTTPException(status_code=404, detail="资源不存在")
+
+    payload = _resource_payload(form)
+    errors: list[str] = []
+    type_id = _resource_type_id(payload, errors)
+
+    if errors:
+        return _render(
+            request,
+            "resources/edit.html",
+            resource=resource,
+            resource_types=_resource_type_list(db),
+            form=payload,
+            error="；".join(errors),
+        )
+
+    try:
+        services.update_resource(
+            db,
+            resource_id,
+            schemas.ResourceUpdate(
+                name=payload["name"],
+                unit=payload["unit"],
+                type_id=type_id,
+                note=payload["note"],
+            ),
+        )
+    except (ValueError, ValidationError) as exc:
+        return _render(
+            request,
+            "resources/edit.html",
+            resource=resource,
+            resource_types=_resource_type_list(db),
+            form=payload,
+            error=_error_text(exc),
+        )
+    return _redirect("/resources", "资源已更新")
 
 
 @router.post("/resources/{resource_id}/delete")
@@ -483,7 +730,7 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
     offers: list[schemas.ShopOfferCreate] = []
     resource_ids = form.getlist("resource_id")
     resource_qtys = form.getlist("resource_qty")
-    list_costs = form.getlist("list_currency_qty")
+    discounted_costs = form.getlist("discounted_currency_qty")
     discounts = form.getlist("discount_pct")
     min_vips = form.getlist("min_vip_level")
     limits = form.getlist("limit_qty")
@@ -492,7 +739,7 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
         row = {
             "resource_id": resource_id,
             "resource_qty": _at(resource_qtys, index),
-            "list_currency_qty": _at(list_costs, index),
+            "discounted_currency_qty": _at(discounted_costs, index),
             "discount_pct": _at(discounts, index),
             "min_vip_level": _at(min_vips, index),
             "limit_qty": _at(limits, index),
@@ -504,8 +751,10 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
         if not resource_id:
             row_errors.append(f"第 {index + 1} 行未选择资源")
         resource_qty = _parse_float(row["resource_qty"], f"第 {index + 1} 行资源数量", row_errors)
-        list_cost = _parse_float(
-            row["list_currency_qty"], f"第 {index + 1} 行货币数量", row_errors
+        discounted_cost = _parse_float(
+            row["discounted_currency_qty"],
+            f"第 {index + 1} 行折后价",
+            row_errors,
         )
         discount = _parse_optional_float(
             row["discount_pct"], f"第 {index + 1} 行折扣", row_errors
@@ -521,7 +770,7 @@ async def create_shop_page(request: Request, db: Session = Depends(get_db)):
             schemas.ShopOfferCreate(
                 resource_id=int(resource_id),
                 resource_qty=resource_qty,
-                list_currency_qty=list_cost,
+                discounted_currency_qty=discounted_cost,
                 discount_pct=discount,
                 min_vip_level=min_vip,
                 limit_qty=limit,
@@ -684,7 +933,7 @@ async def offer_edit_submit(
     if not resource_id:
         errors.append("请选择资源")
     resource_qty = _parse_float(form.get("resource_qty") or "", "资源数量", errors)
-    list_cost = _parse_float(form.get("list_currency_qty") or "", "货币数量", errors)
+    discounted_cost = _parse_float(form.get("discounted_currency_qty") or "", "折后价/组", errors)
     discount = _parse_optional_float(form.get("discount_pct") or "", "折扣", errors)
     min_vip = _parse_optional_int(
         form.get("min_vip_level") or "", "解锁特权等级", errors
@@ -701,7 +950,7 @@ async def offer_edit_submit(
             form={
                 "resource_id": resource_id,
                 "resource_qty": form.get("resource_qty") or "",
-                "list_currency_qty": form.get("list_currency_qty") or "",
+                "discounted_currency_qty": form.get("discounted_currency_qty") or "",
                 "discount_pct": form.get("discount_pct") or "",
                 "min_vip_level": form.get("min_vip_level") or "",
                 "limit_qty": form.get("limit_qty") or "",
@@ -717,7 +966,7 @@ async def offer_edit_submit(
             schemas.ShopOfferUpdate(
                 resource_id=int(resource_id),
                 resource_qty=resource_qty,
-                list_currency_qty=list_cost,
+                discounted_currency_qty=discounted_cost,
                 discount_pct=discount,
                 min_vip_level=min_vip,
                 limit_qty=limit,
@@ -733,7 +982,7 @@ async def offer_edit_submit(
             form={
                 "resource_id": resource_id,
                 "resource_qty": form.get("resource_qty") or "",
-                "list_currency_qty": form.get("list_currency_qty") or "",
+                "discounted_currency_qty": form.get("discounted_currency_qty") or "",
                 "discount_pct": form.get("discount_pct") or "",
                 "min_vip_level": form.get("min_vip_level") or "",
                 "limit_qty": form.get("limit_qty") or "",
@@ -751,7 +1000,7 @@ async def add_offer_page(shop_id: int, request: Request, db: Session = Depends(g
     if not resource_id:
         errors.append("请选择资源")
     resource_qty = _parse_float(form.get("resource_qty") or "", "资源数量", errors)
-    list_cost = _parse_float(form.get("list_currency_qty") or "", "货币数量", errors)
+    discounted_cost = _parse_float(form.get("discounted_currency_qty") or "", "折后价/组", errors)
     discount = _parse_optional_float(form.get("discount_pct") or "", "折扣", errors)
     min_vip = _parse_optional_int(
         form.get("min_vip_level") or "", "解锁特权等级", errors
@@ -766,7 +1015,7 @@ async def add_offer_page(shop_id: int, request: Request, db: Session = Depends(g
             schemas.ShopOfferCreate(
                 resource_id=int(resource_id),
                 resource_qty=resource_qty,
-                list_currency_qty=list_cost,
+                discounted_currency_qty=discounted_cost,
                 discount_pct=discount,
                 min_vip_level=min_vip,
                 limit_qty=limit,
@@ -822,9 +1071,6 @@ async def create_box_page(request: Request, db: Session = Depends(get_db)):
     resources = db.scalars(select(models.Resource).order_by(models.Resource.name)).all()
 
     name = (form.get("name") or "").strip()
-    size = (form.get("size") or "").strip() or None
-    selection_type = (form.get("selection_type") or "choose_one").strip()
-    source = (form.get("source") or "").strip() or None
     note = (form.get("note") or "").strip() or None
 
     errors: list[str] = []
@@ -835,13 +1081,11 @@ async def create_box_page(request: Request, db: Session = Depends(get_db)):
     items: list[schemas.BoxItemCreate] = []
     resource_ids = form.getlist("resource_id")
     quantities = form.getlist("qty")
-    probabilities = form.getlist("probability")
 
     for index, resource_id in enumerate(resource_ids):
         row = {
             "resource_id": resource_id,
             "qty": _at(quantities, index),
-            "probability": _at(probabilities, index),
         }
         if not any(value.strip() for value in row.values()):
             continue
@@ -850,32 +1094,17 @@ async def create_box_page(request: Request, db: Session = Depends(get_db)):
         if not resource_id:
             row_errors.append(f"第 {index + 1} 行未选择资源")
         qty = _parse_float(row["qty"], f"第 {index + 1} 行数量", row_errors)
-        probability = _parse_optional_float(
-            row["probability"], f"第 {index + 1} 行概率", row_errors
-        )
         if row_errors:
             errors.extend(row_errors)
             continue
-        items.append(
-            schemas.BoxItemCreate(
-                resource_id=int(resource_id),
-                qty=qty,
-                probability=probability,
-            )
-        )
+        items.append(schemas.BoxItemCreate(resource_id=int(resource_id), qty=qty))
 
     if errors:
         return _render(
             request,
             "boxes/form.html",
             resources=resources,
-            form={
-                "name": name,
-                "size": size or "",
-                "selection_type": selection_type,
-                "source": source or "",
-                "note": note or "",
-            },
+            form={"name": name, "note": note or ""},
             initial_items=item_rows,
             error="；".join(errors),
         )
@@ -883,27 +1112,14 @@ async def create_box_page(request: Request, db: Session = Depends(get_db)):
     try:
         box = services.create_box(
             db,
-            schemas.BoxCreate(
-                name=name,
-                size=size,
-                selection_type=selection_type,
-                source=source,
-                note=note,
-                items=items,
-            ),
+            schemas.BoxCreate(name=name, note=note, items=items),
         )
     except (ValueError, ValidationError) as exc:
         return _render(
             request,
             "boxes/form.html",
             resources=resources,
-            form={
-                "name": name,
-                "size": size or "",
-                "selection_type": selection_type,
-                "source": source or "",
-                "note": note or "",
-            },
+            form={"name": name, "note": note or ""},
             initial_items=item_rows,
             error=_error_text(exc),
         )
@@ -954,12 +1170,10 @@ async def box_item_edit_submit(
     if not resource_id:
         errors.append("请选择资源")
     qty = _parse_float(form.get("qty") or "", "数量", errors)
-    probability = _parse_optional_float(form.get("probability") or "", "概率", errors)
 
     form_values = {
         "resource_id": resource_id,
         "qty": form.get("qty") or "",
-        "probability": form.get("probability") or "",
     }
 
     if errors:
@@ -981,7 +1195,6 @@ async def box_item_edit_submit(
             schemas.BoxItemUpdate(
                 resource_id=int(resource_id),
                 qty=qty,
-                probability=probability,
             ),
         )
     except (ValueError, ValidationError) as exc:
@@ -1005,7 +1218,6 @@ async def add_box_item_page(box_id: int, request: Request, db: Session = Depends
     if not resource_id:
         errors.append("请选择资源")
     qty = _parse_float(form.get("qty") or "", "数量", errors)
-    probability = _parse_optional_float(form.get("probability") or "", "概率", errors)
     if errors:
         return _redirect(f"/boxes/{box_id}", "；".join(errors), "error")
     try:
@@ -1015,7 +1227,6 @@ async def add_box_item_page(box_id: int, request: Request, db: Session = Depends
             schemas.BoxItemCreate(
                 resource_id=int(resource_id),
                 qty=qty,
-                probability=probability,
             ),
         )
     except (ValueError, ValidationError) as exc:

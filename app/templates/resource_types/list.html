@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}资源类型 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>资源类型</h1>
+    <p class="muted">维护资源的分类，例如基础资源、稀有资源、兵卡资源。创建资源时必须选择类型。</p>
+  </div>
+  <a class="btn ghost" href="/resources">去资源列表</a>
+</div>
+
+<section class="grid-main">
+  <div class="card">
+    <div class="card-head"><h2>类型列表</h2><span class="muted small">{{ items | length }} 项</span></div>
+    {% if items %}
+    <table class="table">
+      <thead>
+        <tr><th>名称</th><th>排序</th><th>资源数</th><th>备注</th><th class="right">操作</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="strong">{{ item.name }}</td>
+          <td class="muted">{{ item.sort_order }}</td>
+          <td>{{ item.resource_count }}</td>
+          <td class="muted">{{ item.note or '-' }}</td>
+          <td class="right">
+            <div class="row-actions">
+              <a class="btn ghost small" href="/resource-types/{{ item.id }}/edit">编辑</a>
+              {% if item.resource_count == 0 %}
+              <form method="post" action="/resource-types/{{ item.id }}/delete" onsubmit="return confirm('删除资源类型「{{ item.name }}」？')">
+                <button class="btn danger small" type="submit">删除</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">还没有资源类型，用右侧表单新建。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>新建资源类型</h2></div>
+    <form method="post" action="/resource-types" class="stack">
+      <label>类型名称
+        <input name="name" required maxlength="64" placeholder="如：兵卡资源" value="{{ form.get('name', '') if form else '' }}">
+      </label>
+      <label>排序
+        <input type="number" step="1" name="sort_order" value="{{ form.get('sort_order', 0) if form else 0 }}">
+      </label>
+      <label>备注
+        <input name="note" placeholder="可选" value="{{ form.get('note', '') if form else '' }}">
+      </label>
+      <button class="btn primary" type="submit">保存资源类型</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

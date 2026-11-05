@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}编辑资源 · {{ resource.name }}{% endblock %}
+{% block content %}
+{% set selected_type = (form.get('type_id') or resource.type_id) | int %}
+<div class="page-head">
+  <div>
+    <h1>编辑资源</h1>
+    <p class="muted">{{ resource.name }}</p>
+  </div>
+  <a class="btn ghost" href="/resources">返回资源列表</a>
+</div>
+
+<form method="post" action="/resources/{{ resource.id }}/edit" class="card narrow">
+  <div class="stack">
+    <label>资源名称
+      <input name="name" required maxlength="64" value="{{ form.get('name', resource.name) }}">
+    </label>
+    <label>资源类型
+      <select name="type_id" required>
+        <option value="">请选择类型</option>
+        {% for type in resource_types %}
+        <option value="{{ type.id }}" {{ 'selected' if type.id == selected_type else '' }}>{{ type.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="hint">没有想要的类型？去 <a href="/resource-types">资源类型</a> 页新建。</p>
+    <label>单位
+      <input name="unit" maxlength="32" value="{{ form.get('unit', resource.unit) }}">
+    </label>
+    <label>备注
+      <input name="note" placeholder="可选" value="{{ form.get('note', resource.note or '') }}">
+    </label>
+    <div class="actions">
+      <a class="btn ghost" href="/resources">取消</a>
+      <button class="btn primary" type="submit">保存修改</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

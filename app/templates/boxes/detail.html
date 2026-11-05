@@ -1,14 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ box.name }} · 战火勋章资源助手{% endblock %}
 {% block content %}
-{% set type_labels = {'choose_one': '自选一个', 'fixed': '固定内容', 'random': '随机'} %}
 <div class="page-head">
   <div>
     <h1>{{ box.name }}</h1>
     <p class="muted">
-      {% if box.size %}<span class="badge">{{ box.size }}</span>{% endif %}
-      <span class="badge">{{ type_labels.get(box.selection_type, box.selection_type) }}</span>
-      {% if box.source %}<span class="sep">·</span>来源：{{ box.source }}{% endif %}
+      自选资源箱
       {% if box.note %}<span class="sep">·</span>{{ box.note }}{% endif %}
     </p>
   </div>
@@ -28,15 +25,13 @@
   {% if box.items %}
   <table class="table">
     <thead>
-      <tr><th>资源</th><th>数量</th><th>概率</th><th>备注</th><th class="right">操作</th></tr>
+      <tr><th>资源</th><th>数量</th><th class="right">操作</th></tr>
     </thead>
     <tbody>
       {% for item in box.items %}
       <tr>
         <td class="strong">{{ item.resource.name }}</td>
         <td>{{ item.qty | num }}</td>
-        <td>{% if item.probability is not none %}{{ (item.probability * 100) | num }}%{% else %}-{% endif %}</td>
-        <td class="muted">{{ item.note or '-' }}</td>
         <td class="right">
           <div class="row-actions">
             <a class="btn ghost small" href="/boxes/{{ box.id }}/items/{{ item.id }}/edit">编辑</a>
@@ -66,10 +61,7 @@
       </select>
     </label>
     <label>数量
-      <input type="number" step="any" min="0" name="qty" required placeholder="500000">
-    </label>
-    <label>概率（0–1）
-      <input type="number" step="any" min="0" max="1" name="probability" placeholder="随机箱才填">
+      <input type="number" step="any" min="0" name="qty" required placeholder="30">
     </label>
     <div class="form-actions">
       <button class="btn primary" type="submit">添加资源</button>
