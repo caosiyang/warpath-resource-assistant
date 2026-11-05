@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}助手 · 战火勋章资源助手{% endblock %}
+{% block content %}
+<div class="page-head chat-head">
+  <div>
+    <h1>助手</h1>
+    <p class="muted">用自然语言问开箱、兑换和购买建议，计算都由本地引擎完成。</p>
+  </div>
+  <div class="chat-status">
+    <span class="badge">VIP {{ current_vip }}</span>
+    <span>资源估值 {{ status.resources_priced }}/{{ status.resources_total }}</span>
+    {% if status.missing_shops %}
+    <span class="muted">未建商店：{{ status.missing_shops | join('、') }}</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="chat-page" x-data='chatApp({{ sessions | tojson }}, {{ initial_session_id if initial_session_id is not none else "null" }})' x-init="init()">
+  <aside class="card chat-sidebar">
+    <button type="button" class="btn primary" @click="newSession()">+ 新对话</button>
+    <div class="session-list">
+      <template x-for="item in sessions" :key="item.id">
+        <div class="session-item" :class="{ active: item.id === sessionId }" @click="loadSession(item.id)">
+          <span x-text="item.title"></span>
+          <button type="button" class="icon-btn" title="删除对话" @click.stop="removeSession(item.id)">×</button>
+        </div>
+      </template>
+      <p class="muted small" x-show="!sessions.length">还没有对话</p>
+    </div>
+  </aside>
+
+  <section class="card chat-main">
+    <div class="chat-messages" x-ref="scroller">
+      <div class="chat-empty" x-show="!messages.length && !streaming">
+        <h2>今天想算什么？</h2>
+        <p class="hint">直接问，或者点下面的例子。</p>
+        <div class="prompt-chips">
+          <button type="button" class="prompt-chip" @click="ask('我的自选箱该选什么？')">我的自选箱该选什么？</button>
+          <button type="button" class="prompt-chip" @click="ask('特权商店这周买什么？')">特权商店这周买什么？</button>
+          <button type="button" class="prompt-chip" @click="ask('我现在缺 500 零件，怎么买最划算？')">缺 500 零件怎么买？</button>
+        </div>
+      </div>
+
+      <template x-for="(message, index) in messages" :key="index">
+        <div class="chat-row" :class="message.role">
+          <div class="avatar" x-text="message.role === 'user' ? '我' : '助手'"></div>
+          <div class="bubble">
+            <template x-if="message.tools && message.tools.length">
+              <div class="tool-chips">
+                <template x-for="tool in message.tools" :key="tool">
+                  <span class="tool-chip" x-text="'已计算：' + tool"></span>
+                </template>
+              </div>
+            </template>
+            <div class="chat-text" x-show="message.role === 'user'" x-text="message.content"></div>
+            <div class="chat-text chat-markdown" x-show="message.role === 'assistant'" x-html="message.html || escapeText(message.content)"></div>
+          </div>
+        </div>
+      </template>
+
+      <div class="chat-row assistant" x-show="streaming">
+        <div class="avatar">助手</div>
+        <div class="bubble">
+          <div class="tool-chips" x-show="streamTools.length">
+            <template x-for="tool in streamTools" :key="tool">
+              <span class="tool-chip" x-text="'已计算：' + tool"></span>
+            </template>
+          </div>
+          <div class="chat-text streaming" x-text="streamText || '思考中…'"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert error chat-error" x-show="error" x-text="error"></div>
+
+    <form class="chat-composer" @submit.prevent="send()">
+      <textarea
+        x-model="input"
+        rows="1"
+        maxlength="4000"
+        placeholder="例如：我的自选箱该选什么？"
+        @keydown.enter.exact.prevent="send()"
+      ></textarea>
+      <button class="btn primary" type="submit" :disabled="streaming || !input.trim()" x-text="streaming ? '计算中…' : '发送'">发送</button>
+    </form>
+  </section>
+</div>
+
+<div id="chat-init-error" class="alert error" hidden>
+  页面脚本没有正常初始化。请按 Ctrl/Cmd + Shift + R 强制刷新；如果仍然不行，打开浏览器控制台看报错。
+</div>
+
+<script>
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      var root = document.querySelector(".chat-page");
+      var box = document.getElementById("chat-init-error");
+      if (root && box && !root._x_dataStack) box.hidden = false;
+    }, 500);
+  });
+</script>
+{% endblock %}

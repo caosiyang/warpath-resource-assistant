@@ -10,11 +10,24 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import models, schemas, services
+from .. import chat as chat_service
+from .. import models, pricing, schemas, services
 from ..db import get_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "static"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def _asset_version() -> str:
+    """用静态文件修改时间做版本号，避免浏览器一直用旧的 app.js。"""
+    files = [
+        STATIC_DIR / "app.css",
+        STATIC_DIR / "app.js",
+        STATIC_DIR / "alpine.min.js",
+    ]
+    times = [path.stat().st_mtime for path in files if path.exists()]
+    return str(int(max(times))) if times else "1"
 
 
 def _fmt_num(value) -> str:
@@ -41,7 +54,10 @@ router = APIRouter()
 def _render(request: Request, name: str, **context):
     context.setdefault("msg", request.query_params.get("msg"))
     context.setdefault("msg_kind", request.query_params.get("kind", "ok"))
-    return templates.TemplateResponse(request, name, context)
+    context.setdefault("asset_version", _asset_version())
+    response = templates.TemplateResponse(request, name, context)
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 def _redirect(url: str, msg: str | None = None, kind: str = "ok") -> RedirectResponse:
@@ -132,6 +148,28 @@ def index(request: Request, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
+@router.get("/chat")
+def chat_page(
+    request: Request,
+    session: int | None = None,
+    db: Session = Depends(get_db),
+):
+    sessions = chat_service.list_sessions(db)
+    if session is None and sessions:
+        session = sessions[0].id
+    return _render(
+        request,
+        "chat.html",
+        sessions=[{"id": item.id, "title": item.title} for item in sessions],
+        initial_session_id=session,
+        status=pricing.build_data_status(db),
+        current_vip=services.get_current_vip_level(db),
+    )
+
+
 @router.get("/settings")
 def settings_page(request: Request, db: Session = Depends(get_db)):
     return _render(

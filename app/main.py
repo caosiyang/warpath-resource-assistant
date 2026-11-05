@@ -12,6 +12,7 @@ from .db import Base, SessionLocal, engine
 from .migrations import run_migrations
 from .routers import (
     boxes,
+    chat,
     currencies,
     pages,
     resource_types,
@@ -45,6 +46,7 @@ app.include_router(shop_types.router)
 app.include_router(shops.router)
 app.include_router(boxes.router)
 app.include_router(settings.router)
+app.include_router(chat.router)
 
 
 @app.exception_handler(ValueError)

@@ -247,3 +247,42 @@ class BoxItem(Base):
 
     box: Mapped[Box] = relationship(back_populates="items")
     resource: Mapped[Resource] = relationship(back_populates="box_items")
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(64), default="新对话")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.id",
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('user', 'assistant', 'tool')", name="ck_chat_message_role"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text, default="")
+    # 仅 assistant 消息使用：OpenAI 格式的 tool_calls JSON
+    tool_calls_json: Mapped[str | None] = mapped_column(Text, default=None)
+    # 仅 tool 消息使用
+    tool_call_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    name: Mapped[str | None] = mapped_column(String(64), default=None)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    session: Mapped[ChatSession] = relationship(back_populates="messages")

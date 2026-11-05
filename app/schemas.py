@@ -312,3 +312,19 @@ class SettingsOut(BaseModel):
 
 class SettingsUpdate(BaseModel):
     current_vip_level: int = Field(ge=1, le=25)
+
+
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
+class ChatRequest(BaseModel):
+    session_id: int | None = None
+    message: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("message")
+    @classmethod
+    def clean_message(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("消息不能为空")
+        return value

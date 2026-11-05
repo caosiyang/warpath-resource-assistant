@@ -1,8 +1,8 @@
 # 战火勋章 · 资源助手
 
-资源最大化的数据底座。先把 VIP 黄金兑换比例、商店商品、箱子内容录进本地数据库，后续用黄金等价物（GEV）计算性价比，并由 OpenCode agent 给出开箱/兑换建议。
+资源最大化的数据底座。先把 VIP 黄金兑换比例、商店商品、箱子内容录进本地数据库，用黄金等价物（GEV）计算性价比，并在页面内通过带工具的模型对话给出开箱/兑换建议。
 
-当前阶段：**M0 + M1 数据录入端**。
+当前阶段：**数据录入 + 计价内核 + 页面内助手**。
 
 ## 技术栈
 
@@ -10,15 +10,20 @@
 - FastAPI + Jinja2 + Alpine.js（无前端构建）
 - SQLAlchemy 2.x
 - SQLite（单文件，WAL 模式）
+- OpenAI 兼容模型接口（httpx，流式 + function calling）
 
 ## 快速开始
 
 ```bash
 uv sync
+cp .env.example .env
+# 编辑 .env，填入模型接口地址和 API Key
 uv run uvicorn app.main:app --reload --port 8765
 ```
 
 打开 <http://127.0.0.1:8765>。（如果 8765 被占用，换成其他端口。）
+
+`.env` 已被 gitignore，不会进仓库。不配置模型也能使用录入页面，只是 `/chat` 会提示模型未配置。
 
 首次启动会自动建表并写入种子数据：
 
@@ -53,6 +58,7 @@ uv run uvicorn app.main:app --reload --port 8765
 | `/boxes/new` | 新建箱子（含首批资源） |
 | `/boxes/{id}` | 箱子详情，增删资源 |
 | `/boxes/{id}/items/{item_id}/edit` | 编辑箱内资源 |
+| `/chat` | 页面内模型对话（流式 + 本地工具计算） |
 | `/settings` | 当前特权等级（1–25） |
 
 ## 数据口径
@@ -86,9 +92,56 @@ uv run uvicorn app.main:app --reload --port 8765
 
 **箱子**：所有箱子都是自选资源，只需要录入箱子名称、可选资源和每个资源的数量；不再区分大小、类型、获取途径，也不需要概率。
 
+## 页面内助手
+
+`/chat` 是一个带工具的模型对话页。模型只负责理解问题和组织语言，所有价格与价值由本地 `app/pricing.py` 计算。
+
+计算口径：
+
+- **GEV（黄金等价物）**：当前 VIP 下，该资源在黄金商店的最便宜单价（黄金/个）；
+- 资源价值 = 数量 × GEV；
+- 自选箱只能选一个资源栈，按 `value_gev` 比较；
+- 黄金商店内部的 `efficiency` 接近 1，不能用来跨资源比较，应看折扣、限购和卡点；
+- 代币商店只有和黄金商店存在同资源重叠时，才反推汇率并换算成黄金成本；
+- 没有价格或汇率时直接说明数据不足，不估算。
+
+模型可调用的只读工具：
+
+```
+get_settings          当前 VIP
+get_resource_values   资源 GEV 表 + 未定价资源
+list_boxes            箱子及可选资源
+evaluate_box          箱子各选项价值与推荐
+list_shops            商店、货币、有效商品数
+evaluate_shop         商品折扣、限购、价值与性价比
+get_data_status       数据完整度与缺口
+```
+
+对话接口用 SSE 流式返回：
+
+```
+event: session   会话 ID
+event: tool      正在执行的工具
+event: token     模型输出片段
+event: html      最终 Markdown 渲染结果
+event: done      完成
+event: error     错误
+```
+
+会话历史存 SQLite 的 `chat_sessions` / `chat_messages`，刷新页面后可继续。
+
+模型配置读环境变量或项目根目录 `.env`：
+
+```
+WARPATH_LLM_BASE_URL=http://10.110.147.148:8317/v1
+WARPATH_LLM_API_KEY=...
+WARPATH_LLM_MODEL=deepseek-v4.1-flash
+WARPATH_LLM_TIMEOUT=60
+```
+
 ## API
 
-所有页面操作都有对应的 JSON 接口，后续 agent 直接调用。
+所有页面操作都有对应的 JSON 接口；对话页的计算工具与页面共用同一套逻辑。
 
 ```
 GET/POST      /api/resource-types
@@ -113,6 +166,11 @@ GET/POST      /api/boxes
 GET/PATCH/DELETE /api/boxes/{id}
 POST          /api/boxes/{id}/items
 PATCH/DELETE  /api/boxes/{id}/items/{item_id}
+
+GET           /api/chat/sessions
+POST          /api/chat/sessions
+GET/DELETE    /api/chat/sessions/{id}
+POST          /api/chat                 # SSE 对话
 
 GET/PUT       /api/settings
 GET           /api/health
@@ -179,9 +237,9 @@ uv run pytest -q
 
 ## 下一步
 
-- M2：录入真实数据并核对口径
-- M3：计价引擎（GEV、性价比排名、缺口规划）
-- M4：OpenCode agent + skill 接入
+- 继续录入联盟商店、战役商店商品和更多资源价格
+- 增加预算规划与缺口清单（`--need` / 目标数量）
+- 对话页支持多轮工具编排和更细的卡点权重
 
 ## 目录
 
@@ -189,13 +247,17 @@ uv run pytest -q
 app/
   main.py          FastAPI 入口
   db.py            SQLite 连接与 WAL
-  models.py        ORM 模型
+  models.py        ORM 模型（含对话会话）
   schemas.py       Pydantic 校验
   services.py      业务逻辑（页面与 API 共用）
+  pricing.py       GEV、箱子、商店性价比计算
+  llm.py           OpenAI 兼容流式客户端
+  chat.py          工具定义、agent loop、SSE、会话持久化
   seed.py          种子数据
   routers/         页面与 API 路由
   templates/       Jinja2 模板
   static/          CSS / Alpine.js
+.env               本地模型配置（gitignore）
 data/warpath.db    本地数据库
 tests/             pytest
 ```
